@@ -1,0 +1,50 @@
+publish_rate_hz: 100.0
+joint_state_topic: /joint_states
+
+right_joint_names:
+  - right_shoulder_pan_joint
+  - right_shoulder_lift_joint
+  - right_arm_half_joint
+  - right_elbow_joint
+  - right_wrist_spherical_1_joint
+  - right_wrist_spherical_2_joint
+  - right_wrist_3_joint
+
+left_joint_names:
+  - left_shoulder_pan_joint
+  - left_shoulder_lift_joint
+  - left_arm_half_joint
+  - left_elbow_joint
+  - left_wrist_spherical_1_joint
+  - left_wrist_spherical_2_joint
+  - left_wrist_3_joint
+
+other_joint_names:
+  - linear_joint
+  - pan_joint
+  - tilt_joint
+  - left_gripper_finger1_joint
+  - right_gripper_finger1_joint
+
+# MoveIt-safe homing values (rad) used for RViz/Servo state integration.
+right_home_positions:
+  right_shoulder_pan_joint: -1.500000
+  right_shoulder_lift_joint: -0.200000
+  right_arm_half_joint: -0.150000
+  right_elbow_joint: -2.000000
+  right_wrist_spherical_1_joint: 2.000000
+  right_wrist_spherical_2_joint: -1.235400
+  right_wrist_3_joint: -1.100000
+
+left_home_positions:
+  left_shoulder_pan_joint: 1.500000
+  left_shoulder_lift_joint: 0.200000
+  left_arm_half_joint: 0.150000
+  left_elbow_joint: 2.000000
+  left_wrist_spherical_1_joint: -2.000000
+  left_wrist_spherical_2_joint: 1.235400
+  left_wrist_3_joint: 1.100000
+
+# Reference Kinova API-style home tuples from user (degrees):
+# right: (266.39, 76.92, 190.84, 310.59, 190.75, 180.69, 180.00)
+# left:  (93.61, 283.08, 169.16, 49.41, 169.25, 179.31, 180.00)

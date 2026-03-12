@@ -1,0 +1,15 @@
+<launch>
+  <arg name="input_topic" default="/movo_servo/cmd_vel" />
+  <arg name="output_topic" default="/servo_server/delta_twist_cmds" />
+  <arg name="twist_frame" default="base_link" />
+  <arg name="publish_rate" default="100.0" />
+  <arg name="command_timeout" default="0.25" />
+
+  <node pkg="movo_servo" type="cmd_vel_to_twist_stamped.py" name="cmd_vel_to_twist_stamped" output="screen">
+    <param name="input_topic" value="$(arg input_topic)" />
+    <param name="output_topic" value="$(arg output_topic)" />
+    <param name="frame_id" value="$(arg twist_frame)" />
+    <param name="publish_rate" value="$(arg publish_rate)" />
+    <param name="command_timeout" value="$(arg command_timeout)" />
+  </node>
+</launch>

@@ -1,0 +1,74 @@
+<launch>
+  <arg name="arm" default="right" />
+  <arg name="world" default="$(find movo_gazebo)/worlds/test_zone.sdf" />
+  <arg name="gazebo_gui" default="true" />
+  <arg name="paused" default="false" />
+  <arg name="rviz" default="true" />
+
+  <!-- MOVO kinematic and gripper configuration -->
+  <env name="MOVO_HAS_KINOVA_ARM" value="true" />
+  <env name="MOVO_HAS_TWO_KINOVA_ARMS" value="true" />
+  <env name="MOVO_HAS_KINOVA_ARM_7DOF" value="true" />
+  <env name="MOVO_HAS_KINOVA_ARM_6DOF" value="false" />
+  <env name="USE_KG2_FOR_MOVEIT_CONFIG" value="false" />
+  <env name="USE_KG3_FOR_MOVEIT_CONFIG" value="true" />
+  <env name="USE_R85_FOR_MOVEIT_CONFIG" value="false" />
+  <env name="MOVO_HAS_RIGHT_KG2_GRIPPER" value="false" />
+  <env name="MOVO_HAS_LEFT_KG2_GRIPPER" value="false" />
+  <env name="MOVO_HAS_RIGHT_KG3_GRIPPER" value="true" />
+  <env name="MOVO_HAS_LEFT_KG3_GRIPPER" value="true" />
+  <env name="MOVO_HAS_RIGHT_ROBOTIQ_GRIPPER" value="false" />
+  <env name="MOVO_HAS_LEFT_ROBOTIQ_GRIPPER" value="false" />
+  <env name="GAZEBO_MODEL_PATH" value="$(find movo_gazebo)/models:$(optenv GAZEBO_MODEL_PATH)" />
+
+  <include file="$(find movo_description)/launch/movo_upload.launch" />
+
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+    <param name="publish_frequency" type="double" value="100.0" />
+  </node>
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(arg world)" />
+    <arg name="paused" value="$(arg paused)" />
+    <arg name="gui" value="$(arg gazebo_gui)" />
+  </include>
+
+  <node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model"
+        args="-urdf -param /robot_description -model movo"
+        respawn="false" output="screen" />
+
+  <rosparam file="$(find movo_gazebo)/controller/right_arm_7dof_controller.yaml" command="load" />
+  <rosparam file="$(find movo_gazebo)/controller/left_arm_7dof_controller.yaml" command="load" />
+  <rosparam file="$(find movo_gazebo)/controller/right_gripper_controller.yaml" command="load" />
+  <rosparam file="$(find movo_gazebo)/controller/left_gripper_controller.yaml" command="load" />
+  <rosparam file="$(find movo_gazebo)/controller/head_controller.yaml" command="load" />
+  <rosparam file="$(find movo_gazebo)/controller/torso_controller.yaml" command="load" />
+  <rosparam file="$(find movo_gazebo)/controller/joint_state_controller.yaml" command="load" />
+
+  <node pkg="controller_manager" type="spawner" name="controller_spawner" output="screen"
+        args="movo/right_arm_controller
+              movo/left_arm_controller
+              movo/right_gripper_controller
+              movo/left_gripper_controller
+              movo/torso_controller
+              movo/head_controller
+              joint_state_controller" />
+
+  <include file="$(find movo_7dof_moveit_config)/launch/move_group.launch">
+    <arg name="info" value="true" />
+  </include>
+
+  <include if="$(arg rviz)" file="$(find movo_7dof_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="config" value="true" />
+  </include>
+
+  <node if="$(eval arg('arm') == 'right')" pkg="moveit_servo" type="servo_server" name="servo_server"
+        output="screen" respawn="true" respawn_delay="2.0">
+    <rosparam command="load" file="$(find movo_servo)/config/right_arm_servo.yaml" />
+  </node>
+
+  <node if="$(eval arg('arm') == 'left')" pkg="moveit_servo" type="servo_server" name="servo_server"
+        output="screen" respawn="true" respawn_delay="2.0">
+    <rosparam command="load" file="$(find movo_servo)/config/left_arm_servo.yaml" />
+  </node>
+</launch>

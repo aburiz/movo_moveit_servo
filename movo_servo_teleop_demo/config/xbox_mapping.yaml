@@ -1,0 +1,29 @@
+# Xbox mapping defaults for Linux joy_node.
+# Assumption: standard Xbox controller mapping from Ubuntu 20.04 joy driver.
+
+publish_rate_hz: 100.0
+command_frame: base_link
+default_active_arm: right
+
+# Buttons
+deadman_button: -1         # -1 disables deadman for initial testing
+toggle_arm_button: -1      # -1 keeps right arm active by default
+home_button: 3             # Y
+
+# Axes
+axis_linear_x: 1           # left stick vertical
+axis_linear_y: 0           # left stick horizontal
+axis_linear_z: 4           # right stick vertical
+axis_angular_z: 3          # right stick horizontal (yaw)
+axis_trigger_left: 2       # LT (unused in default mapping)
+axis_trigger_right: 5      # RT (unused in default mapping)
+
+# Bumpers used for roll
+button_roll_negative: 4    # LB
+button_roll_positive: 5    # RB
+
+# Scales in m/s and rad/s for "speed_units" Servo mode
+scale_linear_xy: 0.30
+scale_linear_z: 0.25
+scale_angular_roll: 0.70
+scale_angular_yaw: 0.90
