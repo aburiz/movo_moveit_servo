@@ -1,6 +1,13 @@
 publish_rate_hz: 100.0
 joint_state_topic: /joint_states
 
+right_gripper_joint: right_gripper_finger1_joint
+left_gripper_joint: left_gripper_finger1_joint
+gripper_min_position: 0.0
+gripper_max_position: 0.986111027
+right_gripper_home_position: 0.0
+left_gripper_home_position: 0.0
+
 right_joint_names:
   - right_shoulder_pan_joint
   - right_shoulder_lift_joint

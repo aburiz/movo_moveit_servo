@@ -1,29 +1,35 @@
-# Xbox mapping defaults for Linux joy_node.
-# Assumption: standard Xbox controller mapping from Ubuntu 20.04 joy driver.
+# Xbox mapping defaults for Linux joy_node on Ubuntu 20.04.
+# Assumption: standard wired/wireless Xbox mapping from joy_node.
 
 publish_rate_hz: 100.0
 command_frame: base_link
 default_active_arm: right
+driver_enabled_on_start: false
 
 # Buttons
-deadman_button: -1         # -1 disables deadman for initial testing
-toggle_arm_button: -1      # -1 keeps right arm active by default
-home_button: 3             # Y
+# A=0, B=1, X=2, Y=3, LB=4, RB=5
+start_driver_button: 0     # A -> start arm driver
+estop_button: 1            # B -> emergency stop (latched)
+cycle_target_button: 2     # X -> cycle left_arm/right_arm
+home_current_button: 5     # RB -> home current arm
+home_both_button: 4        # LB double-tap -> home both arms
+home_both_double_tap_window: 0.45
 
 # Axes
 axis_linear_x: 1           # left stick vertical
 axis_linear_y: 0           # left stick horizontal
 axis_linear_z: 4           # right stick vertical
 axis_angular_z: 3          # right stick horizontal (yaw)
-axis_trigger_left: 2       # LT (unused in default mapping)
-axis_trigger_right: 5      # RT (unused in default mapping)
-
-# Bumpers used for roll
-button_roll_negative: 4    # LB
-button_roll_positive: 5    # RB
+axis_angular_pitch: 7      # D-pad up/down -> pitch
+axis_angular_roll: 6       # D-pad left/right -> roll
+axis_trigger_left: 2       # LT -> open gripper
+axis_trigger_right: 5      # RT -> close gripper
 
 # Scales in m/s and rad/s for "speed_units" Servo mode
 scale_linear_xy: 0.30
 scale_linear_z: 0.25
 scale_angular_roll: 0.70
+scale_angular_pitch: 0.70
 scale_angular_yaw: 0.90
+gripper_open_speed: 0.75
+gripper_close_speed: 0.75

@@ -13,25 +13,33 @@ RViz-only proof of concept for realtime MOVO arm teleoperation using MoveIt Serv
   - `/left_arm_driver/in/joint_velocity`
   - `/right_arm_driver/in/cartesian_velocity`
   - `/left_arm_driver/in/cartesian_velocity`
+  - `/right_arm_driver/in/gripper_velocity`
+  - `/left_arm_driver/in/gripper_velocity`
 - Adds a test obstacle box into the planning scene.
 
 ## Architecture
 
 - `move_group` + MOVO MoveIt config: planning scene and collision model.
 - `right_servo_server` and `left_servo_server`: MoveIt Servo nodes.
-- `xbox_servo_mapper.py`: `/joy` -> arm-specific `TwistStamped` commands + deadman/home/toggle logic.
+- `xbox_servo_mapper.py`: `/joy` -> arm-specific `TwistStamped` + gripper velocity commands with start/estop/arm-cycle/home logic.
 - `fake_kinova_command_bridge.py`: integrates Servo joint velocities to `/joint_states` (RViz motion) and mirrors dummy Kinova-like command topics.
 - `add_test_obstacles.py`: inserts a fixed box obstacle in front of the robot.
 
 ## Controls (default mapping)
 
-- Deadman is disabled by default (`deadman_button: -1`) for quick testing
-- Arm toggle is disabled by default (`toggle_arm_button: -1`) so right arm stays active
-- `Y`: reset active arm to home pose
-- Left stick: Cartesian XY translation
-- Right stick vertical: Cartesian Z translation
-- Right stick horizontal: yaw angular velocity
-- `LB`/`RB`: roll angular velocity
+- `X`: cycle control target (`left_arm` <-> `right_arm`)
+- Left stick vertical: X (forward/back)
+- Left stick horizontal: Y (left/right)
+- Right stick vertical: Z (up/down)
+- Right stick horizontal: yaw
+- D-pad up/down: pitch
+- D-pad left/right: roll
+- `RT`: close gripper (active arm)
+- `LT`: open gripper (active arm)
+- `A`: start arm driver
+- `B`: emergency stop (latched, press `A` to resume)
+- `RB`: home current arm
+- `LB` double-tap: home both arms
 
 ## Launch
 
