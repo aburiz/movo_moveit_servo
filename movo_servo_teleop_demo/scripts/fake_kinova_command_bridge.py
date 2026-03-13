@@ -19,6 +19,8 @@ class FakeKinovaCommandBridge:
 
         self.right_home = dict(rospy.get_param("~right_home_positions", {}))
         self.left_home = dict(rospy.get_param("~left_home_positions", {}))
+        self.right_home_native_degrees = dict(rospy.get_param("~right_home_native_degrees", {}))
+        self.left_home_native_degrees = dict(rospy.get_param("~left_home_native_degrees", {}))
 
         self.right_gripper_joint = rospy.get_param("~right_gripper_joint", "right_gripper_finger1_joint")
         self.left_gripper_joint = rospy.get_param("~left_gripper_joint", "left_gripper_finger1_joint")
@@ -38,6 +40,13 @@ class FakeKinovaCommandBridge:
         self.ensure_joint_in_other_names(self.left_gripper_joint)
         for j in self.right_joint_names + self.left_joint_names + self.other_joint_names:
             self.joint_positions[j] = 0.0
+
+        self.right_home = self.resolve_home_positions(
+            "right", self.right_joint_names, self.right_home, self.right_home_native_degrees
+        )
+        self.left_home = self.resolve_home_positions(
+            "left", self.left_joint_names, self.left_home, self.left_home_native_degrees
+        )
 
         self.apply_home("right")
         self.apply_home("left")
@@ -120,6 +129,64 @@ class FakeKinovaCommandBridge:
     def ensure_joint_in_other_names(self, joint_name):
         if joint_name and joint_name not in self.other_joint_names:
             self.other_joint_names.append(joint_name)
+
+    @staticmethod
+    def wrap_angle(value):
+        return (value + math.pi) % (2.0 * math.pi) - math.pi
+
+    def native_degrees_to_joint_positions(self, joint_names, native_degrees):
+        # Expected input keys: joint1..jointN in Kinova native actuator angle convention.
+        n = len(joint_names)
+        ordered_degrees = []
+        for idx in range(n):
+            key = "joint{}".format(idx + 1)
+            if key not in native_degrees:
+                return None
+            ordered_degrees.append(float(native_degrees[key]))
+
+        if n == 7:
+            # Match conversion in movo_joint_interface:
+            # kinova_api_wrapper.get_angular_position() + jaco_joint_controller._update_controller_data().
+            mapped = [
+                math.radians(ordered_degrees[0]),
+                math.radians(ordered_degrees[1] - 180.0),
+                math.radians(ordered_degrees[2]),
+                math.radians(ordered_degrees[3] - 180.0),
+                math.radians(ordered_degrees[4]),
+                math.radians(ordered_degrees[5] - 180.0),
+                math.radians(ordered_degrees[6]),
+            ]
+            for i in (0, 2, 4, 6):
+                mapped[i] = self.wrap_angle(mapped[i])
+        elif n == 6:
+            mapped = [
+                math.radians(ordered_degrees[0]),
+                math.radians(ordered_degrees[1] - 180.0),
+                math.radians(ordered_degrees[2] - 180.0),
+                math.radians(ordered_degrees[3]),
+                math.radians(ordered_degrees[4]),
+                math.radians(ordered_degrees[5]),
+            ]
+            for i in (0, 3, 4, 5):
+                mapped[i] = self.wrap_angle(mapped[i])
+        else:
+            mapped = [self.wrap_angle(math.radians(v)) for v in ordered_degrees]
+
+        return {joint_names[i]: mapped[i] for i in range(n)}
+
+    def resolve_home_positions(self, arm_name, joint_names, home_positions, native_degrees):
+        if native_degrees:
+            converted = self.native_degrees_to_joint_positions(joint_names, native_degrees)
+            if converted is not None:
+                rospy.loginfo("Using %s_home_native_degrees for home pose conversion", arm_name)
+                return converted
+            rospy.logwarn(
+                "%s_home_native_degrees is incomplete for %d joints. Falling back to %s_home_positions.",
+                arm_name,
+                len(joint_names),
+                arm_name,
+            )
+        return home_positions
 
     def active_arm_cb(self, msg):
         arm = msg.data.strip().lower()

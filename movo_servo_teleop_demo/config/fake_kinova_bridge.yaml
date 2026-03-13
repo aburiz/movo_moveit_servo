@@ -8,6 +8,27 @@ gripper_max_position: 0.986111027
 right_gripper_home_position: 0.0
 left_gripper_home_position: 0.0
 
+# Optional native Kinova home angles (degrees) from real robot.
+# If provided, fake_kinova_command_bridge converts these to MOVO ROS joint coordinates
+# using the same offset/wrapping path as movo_joint_interface.
+right_home_native_degrees:
+  joint1: 86.39
+  joint2: 82.92
+  joint3: 190.84
+  joint4: 310.59
+  joint5: 190.75
+  joint6: 180.69
+  joint7: 180.00
+
+left_home_native_degrees:
+  joint1: 274.61
+  joint2: 277.08
+  joint3: 169.16
+  joint4: 49.41
+  joint5: 169.25
+  joint6: 179.31
+  joint7: 180.00
+
 right_joint_names:
   - right_shoulder_pan_joint
   - right_shoulder_lift_joint
@@ -33,25 +54,25 @@ other_joint_names:
   - left_gripper_finger1_joint
   - right_gripper_finger1_joint
 
-# MoveIt-safe homing values (rad) used for RViz/Servo state integration.
+# Custom home from user (degrees):
+# right: (266.39, 82.92, 190.84, 310.59, 190.75, 180.69, 180.00)
+# left:  (94.61, 277.08, 169.16, 49.41, 169.25, 179.31, 180.00)
+# Stored below as converted MOVO ROS joint coordinates (radians).
+# These are kept as fallback if native-degree fields are removed.
 right_home_positions:
-  right_shoulder_pan_joint: -1.500000
-  right_shoulder_lift_joint: -0.200000
-  right_arm_half_joint: -0.150000
-  right_elbow_joint: -2.000000
-  right_wrist_spherical_1_joint: 2.000000
-  right_wrist_spherical_2_joint: -1.235400
-  right_wrist_3_joint: -1.100000
+  right_shoulder_pan_joint: 1.507790
+  right_shoulder_lift_joint: -1.694366
+  right_arm_half_joint: -2.952399
+  right_elbow_joint: 2.279225
+  right_wrist_spherical_1_joint: -2.953970
+  right_wrist_spherical_2_joint: 0.012043
+  right_wrist_3_joint: -3.141593
 
 left_home_positions:
-  left_shoulder_pan_joint: 1.500000
-  left_shoulder_lift_joint: 0.200000
-  left_arm_half_joint: 0.150000
-  left_elbow_joint: 2.000000
-  left_wrist_spherical_1_joint: -2.000000
-  left_wrist_spherical_2_joint: 1.235400
-  left_wrist_3_joint: 1.100000
-
-# Reference Kinova API-style home tuples from user (degrees):
-# right: (266.39, 76.92, 190.84, 310.59, 190.75, 180.69, 180.00)
-# left:  (93.61, 283.08, 169.16, 49.41, 169.25, 179.31, 180.00)
+  left_shoulder_pan_joint: -1.490337
+  left_shoulder_lift_joint: 1.694366
+  left_arm_half_joint: 2.952399
+  left_elbow_joint: -2.279225
+  left_wrist_spherical_1_joint: 2.953970
+  left_wrist_spherical_2_joint: -0.012043
+  left_wrist_3_joint: -3.141593

@@ -49,11 +49,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 					<mesh filename="package://movo_description/meshes/sensors/visual/kinect_one.dae" />
 				</geometry>
 			</visual>
-			<collision>
-				<geometry>
-					<mesh filename="package://movo_description/meshes/sensors/collision/kinect_one_collision.stl" />
-				</geometry>
-			</collision>
 		</link>
 
         <link name="${prefix}_ir_link"/>
