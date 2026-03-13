@@ -34,7 +34,7 @@ num_outgoing_halt_msgs_to_publish: 4
 ## Singularities and limits
 lower_singularity_threshold: 15.0
 hard_stop_singularity_threshold: 30.0
-joint_limit_margin: 0.12
+joint_limit_margin: 0.0
 
 ## Topic names
 cartesian_command_in_topic: delta_twist_cmds
