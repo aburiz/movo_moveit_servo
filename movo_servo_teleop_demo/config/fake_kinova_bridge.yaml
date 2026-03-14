@@ -1,5 +1,20 @@
 publish_rate_hz: 100.0
 joint_state_topic: /joint_states
+right_servo_joint_velocity_topic: /movo_servo_teleop_demo/right/joint_velocity_cmd
+left_servo_joint_velocity_topic: /movo_servo_teleop_demo/left/joint_velocity_cmd
+right_cartesian_velocity_topic: /movo_servo_teleop_demo/right/cartesian_velocity_cmd
+left_cartesian_velocity_topic: /movo_servo_teleop_demo/left/cartesian_velocity_cmd
+right_gripper_velocity_topic: /movo_servo_teleop_demo/right/gripper_velocity_cmd
+left_gripper_velocity_topic: /movo_servo_teleop_demo/left/gripper_velocity_cmd
+home_request_topic: /movo_servo_teleop_demo/home_request
+active_arm_topic: /movo_servo_teleop_demo/active_arm
+
+right_dummy_joint_velocity_topic: /right_arm_driver/in/joint_velocity
+left_dummy_joint_velocity_topic: /left_arm_driver/in/joint_velocity
+right_dummy_cartesian_velocity_topic: /right_arm_driver/in/cartesian_velocity
+left_dummy_cartesian_velocity_topic: /left_arm_driver/in/cartesian_velocity
+right_dummy_gripper_velocity_topic: /right_arm_driver/in/gripper_velocity
+left_dummy_gripper_velocity_topic: /left_arm_driver/in/gripper_velocity
 
 right_gripper_joint: right_gripper_finger1_joint
 left_gripper_joint: left_gripper_finger1_joint

@@ -5,6 +5,22 @@
   <arg name="default_active_arm" default="right" />
   <arg name="enable_left_servo" default="true" />
   <arg name="servo_start_delay" default="18.0" />
+  <arg name="use_real_arms" default="false" />
+  <arg name="local_machine_ip" default="" />
+  <arg name="subnet_mask" default="255.255.255.0" />
+  <arg name="real_arms_use_urdf" default="false" />
+  <arg name="real_arms_feedback_publish_rate" default="0.1" />
+  <arg name="respawn_real_arm_driver" default="true" />
+  <arg name="left_arm_ip" default="192.168.131.20" />
+  <arg name="right_arm_ip" default="192.168.131.30" />
+  <arg name="left_robot_port" default="65535" />
+  <arg name="right_robot_port" default="25000" />
+  <arg name="left_local_cmd_port" default="25010" />
+  <arg name="left_local_broadcast_port" default="25015" />
+  <arg name="right_local_cmd_port" default="25000" />
+  <arg name="right_local_broadcast_port" default="25005" />
+  <arg name="left_arm_serial" default="PJ00900006432489-0" />
+  <arg name="right_arm_serial" default="PJ00900006509075-0" />
 
   <!-- MOVO arm/gripper selection for URDF + SRDF -->
   <env name="MOVO_HAS_KINOVA_ARM" value="true" />
@@ -67,6 +83,38 @@
         name="xbox_servo_mapper" output="screen">
     <rosparam command="load" file="$(find movo_servo_teleop_demo)/config/xbox_mapping.yaml" />
     <param name="default_active_arm" value="$(arg default_active_arm)" />
+  </node>
+
+  <node if="$(eval arg('use_real_arms') and (not arg('local_machine_ip')))"
+        pkg="movo_servo_teleop_demo" type="real_arm_launch_error.py" name="real_arm_launch_error"
+        output="screen" required="true">
+    <param name="message"
+           value="use_real_arms:=true requires local_machine_ip:=&lt;CURRENT_PC_IP&gt;. Example: roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch use_real_arms:=true local_machine_ip:=192.168.131.101" />
+  </node>
+
+  <include if="$(eval arg('use_real_arms') and (arg('local_machine_ip') != ''))"
+           file="$(find movo_servo_teleop_demo)/launch/real_kinova_dual_arms.launch">
+    <arg name="local_machine_ip" value="$(arg local_machine_ip)" />
+    <arg name="subnet_mask" value="$(arg subnet_mask)" />
+    <arg name="use_urdf" value="$(arg real_arms_use_urdf)" />
+    <arg name="feedback_publish_rate" value="$(arg real_arms_feedback_publish_rate)" />
+    <arg name="respawn_driver" value="$(arg respawn_real_arm_driver)" />
+    <arg name="left_arm_ip" value="$(arg left_arm_ip)" />
+    <arg name="right_arm_ip" value="$(arg right_arm_ip)" />
+    <arg name="left_robot_port" value="$(arg left_robot_port)" />
+    <arg name="right_robot_port" value="$(arg right_robot_port)" />
+    <arg name="left_local_cmd_port" value="$(arg left_local_cmd_port)" />
+    <arg name="left_local_broadcast_port" value="$(arg left_local_broadcast_port)" />
+    <arg name="right_local_cmd_port" value="$(arg right_local_cmd_port)" />
+    <arg name="right_local_broadcast_port" value="$(arg right_local_broadcast_port)" />
+    <arg name="left_arm_serial" value="$(arg left_arm_serial)" />
+    <arg name="right_arm_serial" value="$(arg right_arm_serial)" />
+  </include>
+
+  <node if="$(eval arg('use_real_arms') and (arg('local_machine_ip') != ''))"
+        pkg="movo_servo_teleop_demo" type="real_kinova_command_bridge.py"
+        name="real_kinova_command_bridge" output="screen">
+    <param name="config_namespace" value="/movo_servo_teleop_demo/real_arms" />
   </node>
 
   <!-- Right arm Servo -->

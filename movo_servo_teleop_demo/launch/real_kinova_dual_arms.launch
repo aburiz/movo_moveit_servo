@@ -1,0 +1,119 @@
+<launch>
+  <arg name="kinova_robot_type" default="j2s7s300" />
+  <arg name="local_machine_ip" default="" />
+  <arg name="subnet_mask" default="255.255.255.0" />
+  <arg name="use_urdf" default="false" />
+  <arg name="feedback_publish_rate" default="0.1" />
+  <arg name="respawn_driver" default="true" />
+  <arg name="kinova_sdk_lib_dir" default="$(find movo_servo_teleop_demo)/../kinova_api/runtime/usr/lib" />
+
+  <arg name="right_robot_name" default="right_arm" />
+  <arg name="right_arm_serial" default="PJ00900006509075-0" />
+  <arg name="right_arm_ip" default="192.168.131.30" />
+  <arg name="right_robot_port" default="25000" />
+  <arg name="right_local_cmd_port" default="25000" />
+  <arg name="right_local_broadcast_port" default="25005" />
+
+  <arg name="left_robot_name" default="left_arm" />
+  <arg name="left_arm_serial" default="PJ00900006432489-0" />
+  <arg name="left_arm_ip" default="192.168.131.20" />
+  <arg name="left_robot_port" default="65535" />
+  <arg name="left_local_cmd_port" default="25010" />
+  <arg name="left_local_broadcast_port" default="25015" />
+
+  <rosparam ns="/movo_servo_teleop_demo/real_arms" command="load"
+            file="$(find movo_servo_teleop_demo)/config/real_arms.yaml" />
+  <param name="/movo_servo_teleop_demo/real_arms/kinova_robot_type" value="$(arg kinova_robot_type)" />
+  <param name="/movo_servo_teleop_demo/real_arms/local_machine_ip" value="$(arg local_machine_ip)" />
+  <param name="/movo_servo_teleop_demo/real_arms/subnet_mask" value="$(arg subnet_mask)" />
+  <param name="/movo_servo_teleop_demo/real_arms/use_urdf" value="$(arg use_urdf)" />
+  <param name="/movo_servo_teleop_demo/real_arms/feedback_publish_rate" value="$(arg feedback_publish_rate)" />
+  <param name="/movo_servo_teleop_demo/real_arms/respawn_driver" value="$(arg respawn_driver)" />
+
+  <param name="/movo_servo_teleop_demo/real_arms/right_arm/namespace" value="/$(arg right_robot_name)" />
+  <param name="/movo_servo_teleop_demo/real_arms/right_arm/driver_namespace"
+         value="/$(arg right_robot_name)/$(arg right_robot_name)_driver" />
+  <param name="/movo_servo_teleop_demo/real_arms/right_arm/robot_name" value="$(arg right_robot_name)" />
+  <param name="/movo_servo_teleop_demo/real_arms/right_arm/serial_number" value="$(arg right_arm_serial)" />
+  <param name="/movo_servo_teleop_demo/real_arms/right_arm/robot_ip" value="$(arg right_arm_ip)" />
+  <param name="/movo_servo_teleop_demo/real_arms/right_arm/robot_port" value="$(arg right_robot_port)" />
+  <param name="/movo_servo_teleop_demo/real_arms/right_arm/local_cmd_port" value="$(arg right_local_cmd_port)" />
+  <param name="/movo_servo_teleop_demo/real_arms/right_arm/local_broadcast_port"
+         value="$(arg right_local_broadcast_port)" />
+
+  <param name="/movo_servo_teleop_demo/real_arms/left_arm/namespace" value="/$(arg left_robot_name)" />
+  <param name="/movo_servo_teleop_demo/real_arms/left_arm/driver_namespace"
+         value="/$(arg left_robot_name)/$(arg left_robot_name)_driver" />
+  <param name="/movo_servo_teleop_demo/real_arms/left_arm/robot_name" value="$(arg left_robot_name)" />
+  <param name="/movo_servo_teleop_demo/real_arms/left_arm/serial_number" value="$(arg left_arm_serial)" />
+  <param name="/movo_servo_teleop_demo/real_arms/left_arm/robot_ip" value="$(arg left_arm_ip)" />
+  <param name="/movo_servo_teleop_demo/real_arms/left_arm/robot_port" value="$(arg left_robot_port)" />
+  <param name="/movo_servo_teleop_demo/real_arms/left_arm/local_cmd_port" value="$(arg left_local_cmd_port)" />
+  <param name="/movo_servo_teleop_demo/real_arms/left_arm/local_broadcast_port"
+         value="$(arg left_local_broadcast_port)" />
+
+  <node if="$(eval not arg('local_machine_ip'))"
+        pkg="movo_servo_teleop_demo" type="real_arm_launch_error.py" name="real_arm_launch_error"
+        output="screen" required="true">
+    <param name="message"
+           value="real_kinova_dual_arms.launch requires local_machine_ip:=&lt;CURRENT_PC_IP&gt;. Example: roslaunch movo_servo_teleop_demo real_kinova_dual_arms.launch local_machine_ip:=192.168.131.101" />
+  </node>
+
+  <group if="$(eval arg('local_machine_ip') != '')" ns="$(arg right_robot_name)">
+    <group if="$(arg use_urdf)">
+      <param name="robot_description"
+             command="$(find xacro)/xacro '$(find kinova_description)/urdf/$(arg kinova_robot_type)_standalone.xacro' robot_name:=$(arg right_robot_name)" />
+      <node pkg="robot_state_publisher" type="robot_state_publisher" name="state_publisher" output="screen">
+        <remap from="joint_states" to="/$(arg right_robot_name)/$(arg right_robot_name)_driver/out/joint_state" />
+      </node>
+    </group>
+
+    <node name="$(arg right_robot_name)_driver" pkg="kinova_driver" type="kinova_arm_driver"
+          output="screen" cwd="node" args="$(arg kinova_robot_type)" respawn="$(arg respawn_driver)">
+      <env name="LD_LIBRARY_PATH" value="$(arg kinova_sdk_lib_dir):$(optenv LD_LIBRARY_PATH)" />
+      <rosparam subst_value="true">
+connection_type: Ethernet
+ethernet:
+  local_machine_IP: $(arg local_machine_ip)
+  subnet_mask: $(arg subnet_mask)
+  local_cmd_port: $(arg right_local_cmd_port)
+  local_broadcast_port: $(arg right_local_broadcast_port)
+  robot_IP: $(arg right_arm_ip)
+  robotPort: $(arg right_robot_port)
+      </rosparam>
+      <param name="serial_number" value="$(arg right_arm_serial)" />
+      <param name="robot_name" value="$(arg right_robot_name)" />
+      <param name="robot_type" value="$(arg kinova_robot_type)" />
+      <param name="status_interval_seconds" value="$(arg feedback_publish_rate)" />
+    </node>
+  </group>
+
+  <group if="$(eval arg('local_machine_ip') != '')" ns="$(arg left_robot_name)">
+    <group if="$(arg use_urdf)">
+      <param name="robot_description"
+             command="$(find xacro)/xacro '$(find kinova_description)/urdf/$(arg kinova_robot_type)_standalone.xacro' robot_name:=$(arg left_robot_name)" />
+      <node pkg="robot_state_publisher" type="robot_state_publisher" name="state_publisher" output="screen">
+        <remap from="joint_states" to="/$(arg left_robot_name)/$(arg left_robot_name)_driver/out/joint_state" />
+      </node>
+    </group>
+
+    <node name="$(arg left_robot_name)_driver" pkg="kinova_driver" type="kinova_arm_driver"
+          output="screen" cwd="node" args="$(arg kinova_robot_type)" respawn="$(arg respawn_driver)">
+      <env name="LD_LIBRARY_PATH" value="$(arg kinova_sdk_lib_dir):$(optenv LD_LIBRARY_PATH)" />
+      <rosparam subst_value="true">
+connection_type: Ethernet
+ethernet:
+  local_machine_IP: $(arg local_machine_ip)
+  subnet_mask: $(arg subnet_mask)
+  local_cmd_port: $(arg left_local_cmd_port)
+  local_broadcast_port: $(arg left_local_broadcast_port)
+  robot_IP: $(arg left_arm_ip)
+  robotPort: $(arg left_robot_port)
+      </rosparam>
+      <param name="serial_number" value="$(arg left_arm_serial)" />
+      <param name="robot_name" value="$(arg left_robot_name)" />
+      <param name="robot_type" value="$(arg kinova_robot_type)" />
+      <param name="status_interval_seconds" value="$(arg feedback_publish_rate)" />
+    </node>
+  </group>
+</launch>

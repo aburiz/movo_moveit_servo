@@ -71,6 +71,9 @@ class XboxServoMapper:
         self.driver_enabled_pub = rospy.Publisher(
             "/movo_servo_teleop_demo/driver_enabled", Bool, queue_size=2, latch=True
         )
+        self.estop_latched_pub = rospy.Publisher(
+            "/movo_servo_teleop_demo/estop_latched", Bool, queue_size=2, latch=True
+        )
 
         self.right_gripper_pub = rospy.Publisher(
             "/movo_servo_teleop_demo/right/gripper_velocity_cmd", Float64, queue_size=20
@@ -84,6 +87,7 @@ class XboxServoMapper:
 
         self.publish_active_arm()
         self.publish_driver_enabled()
+        self.publish_estop_latched()
         rospy.loginfo("Xbox mapper ready. Active arm: %s", self.active_arm)
 
     def publish_active_arm(self):
@@ -95,6 +99,11 @@ class XboxServoMapper:
         msg = Bool()
         msg.data = self.driver_enabled and not self.estop_latched
         self.driver_enabled_pub.publish(msg)
+
+    def publish_estop_latched(self):
+        msg = Bool()
+        msg.data = self.estop_latched
+        self.estop_latched_pub.publish(msg)
 
     def publish_home_request(self, arm):
         msg = String()
@@ -142,12 +151,14 @@ class XboxServoMapper:
             self.driver_enabled = True
             self.estop_latched = False
             self.publish_driver_enabled()
+            self.publish_estop_latched()
             rospy.loginfo("Driver enabled")
 
         if self.is_rising_edge(msg, self.estop_button):
             self.driver_enabled = False
             self.estop_latched = True
             self.publish_driver_enabled()
+            self.publish_estop_latched()
             rospy.logwarn("Emergency stop latched. Press A to re-enable driver.")
 
         # Cycle active arm on X

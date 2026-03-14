@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.0.2)
 project(movo_servo_teleop_demo)
 
 find_package(catkin REQUIRED COMPONENTS
+  diagnostic_msgs
   geometry_msgs
+  kinova_msgs
   rospy
   sensor_msgs
   std_msgs
@@ -13,6 +15,9 @@ catkin_package()
 catkin_install_python(PROGRAMS
   scripts/xbox_servo_mapper.py
   scripts/fake_kinova_command_bridge.py
+  scripts/real_kinova_command_bridge.py
+  scripts/ping_real_arm.py
+  scripts/real_arm_launch_error.py
   scripts/add_test_obstacles.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
@@ -23,5 +28,6 @@ install(DIRECTORY config launch
 
 install(PROGRAMS
   scripts/delayed_servo_server.sh
+  scripts/extract_local_kinova_sdk.sh
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

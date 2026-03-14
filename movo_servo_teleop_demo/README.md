@@ -1,54 +1,377 @@
-# MOVO Servo Teleop Demo (ROS 1 Noetic)
+# MOVO Servo Teleop Demo
 
-RViz-only proof of concept for realtime MOVO arm teleoperation using MoveIt Servo and Xbox controller input.
+ROS 1 Noetic MoveIt Servo teleop for MOVO with two operating modes:
 
-## What this demo does
+- `RViz only`: the original fake bridge keeps `/joint_states` moving so RViz mirrors Servo output.
+- `RViz + real arms`: the same Servo joint velocity outputs also stream to the classic Kinova Jaco2 Gen2 drivers at 100 Hz.
 
-- Uses the archived `kinova-movo` MoveIt model/config for 7-DOF Jaco arms.
-- Runs in ROS 1 Noetic on Ubuntu 20.04.
-- Uses MoveIt Servo for realtime collision-aware motion.
-- Uses Xbox (`joy_node`) input for Cartesian end-effector teleop.
-- Publishes dummy Kinova-like outputs for inspection:
-  - `/right_arm_driver/in/joint_velocity`
-  - `/left_arm_driver/in/joint_velocity`
-  - `/right_arm_driver/in/cartesian_velocity`
-  - `/left_arm_driver/in/cartesian_velocity`
-  - `/right_arm_driver/in/gripper_velocity`
-  - `/left_arm_driver/in/gripper_velocity`
-- Adds a test obstacle box into the planning scene.
+This integration is built for the classic Kinova ROS stack used in the reference `movo_arm_ws`, not Kortex / Gen3.
 
 ## Architecture
 
-- `move_group` + MOVO MoveIt config: planning scene and collision model.
-- `right_servo_server` and `left_servo_server`: MoveIt Servo nodes.
-- `xbox_servo_mapper.py`: `/joy` -> arm-specific `TwistStamped` + gripper velocity commands with start/estop/arm-cycle/home logic.
-- `fake_kinova_command_bridge.py`: integrates Servo joint velocities to `/joint_states` (RViz motion) and mirrors dummy Kinova-like command topics.
-- `add_test_obstacles.py`: inserts a fixed box obstacle in front of the robot.
+- `xbox_servo_mapper.py`
+  `/joy` -> per-arm Servo twist commands, gripper commands, active-arm selection, start/stop/home events.
+- `fake_kinova_command_bridge.py`
+  Keeps the original RViz path independent by integrating Servo joint velocities into `/joint_states`.
+- `real_kinova_dual_arms.launch`
+  Brings up the classic Kinova Ethernet drivers under:
+  - `/right_arm/right_arm_driver`
+  - `/left_arm/left_arm_driver`
+- `real_kinova_command_bridge.py`
+  Subscribes to the existing Servo outputs:
+  - `/movo_servo_teleop_demo/right/joint_velocity_cmd`
+  - `/movo_servo_teleop_demo/left/joint_velocity_cmd`
+  Converts `rad/s` from MoveIt Servo into `deg/s` for `kinova_msgs/JointVelocity`, then streams to the real drivers at 100 Hz.
+- `/movo_servo_teleop_demo/real_arm_status`
+  Publishes `diagnostic_msgs/DiagnosticArray` with per-arm connection, start/stop, estop, feedback, and command-age status.
 
-## Controls (default mapping)
+## Important Networking Note
 
-- `X`: cycle control target (`left_arm` <-> `right_arm`)
-- Left stick vertical: X (forward/back)
-- Left stick horizontal: Y (left/right)
-- Right stick vertical: Z (up/down)
-- Right stick horizontal: yaw
-- D-pad up/down: pitch
-- D-pad left/right: roll
-- `RT`: close gripper (active arm)
-- `LT`: open gripper (active arm)
-- `A`: start arm driver
-- `B`: emergency stop (latched, press `A` to resume)
-- `RB`: home current arm
-- `LB` double-tap: home both arms
+`local_machine_ip` is intentionally **not hardcoded** to a machine-specific value.
 
-## Launch
+- Default placeholder:
+  [`config/real_arms.yaml`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/config/real_arms.yaml)
+  sets `local_machine_ip: ""`
+- Launch override:
+  [`launch/movo_servo_teleop_demo.launch`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/launch/movo_servo_teleop_demo.launch)
+  and
+  [`launch/real_kinova_dual_arms.launch`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/launch/real_kinova_dual_arms.launch)
+  both accept `local_machine_ip:=<CURRENT_PC_IP>`
+
+If `use_real_arms:=true` and `local_machine_ip` is empty, launch fails loudly instead of silently reusing a stale host IP.
+
+## Current Hardware Network Configuration
+
+- Right arm serial: `PJ00900006509075-0`
+- Right arm IP: `192.168.131.30`
+- Right arm port: `25000`
+- Left arm serial: `PJ00900006432489-0`
+- Left arm IP: `192.168.131.20`
+- Left arm port: `65535`
+- Mask: `255.255.255.0`
+- Robot type: `j2s7s300`
+- Driver local ports used by this launch:
+  - right: `25000` / `25005`
+  - left: `25010` / `25015`
+
+## Environment Setup
+
+These commands match the folders in this machine right now:
+
+```bash
+source /opt/ros/noetic/setup.bash
+source /home/abu/Downloads/movo_arm_ws-main/devel/setup.bash
+export ROS_PACKAGE_PATH=/home/abu/Downloads/movo/movo_moveit_servo:/home/abu/Downloads/movo_arm_ws-main/src:$ROS_PACKAGE_PATH
+export CMAKE_PREFIX_PATH=/home/abu/Downloads/movo_arm_ws-main/devel:$CMAKE_PREFIX_PATH
+```
+
+Recommended long term: put both the Kinova driver stack and this repo in the same catkin workspace and build them together.
+
+For the stock Kinova ROS installation/use flow that this setup is modeled after, see the official reference:
+https://github.com/Kinovarobotics/kinova-ros?tab=readme-ov-file#installation
+
+If `rospack find kinova_driver` fails, the reference workspace was likely moved after it was built and its `devel/.catkin` file still points at the old source tree. In this machine's current state, that stale path is `/home/movo/bimanual_ws/src`, so the explicit `ROS_PACKAGE_PATH` export above is required unless you rebuild `movo_arm_ws-main` in its current location.
+
+The real-arm launch uses the bundled Kinova SDK package in [`kinova_api/`](/home/abu/Downloads/movo/movo_moveit_servo/kinova_api). Right now that is [`KinovaAPI-6.1.0-amd64.deb`](/home/abu/Downloads/movo/movo_moveit_servo/kinova_api/KinovaAPI-6.1.0-amd64.deb). Its shared libraries are extracted locally under `kinova_api/runtime/usr/lib`, and [`real_kinova_dual_arms.launch`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/launch/real_kinova_dual_arms.launch) exports that directory as `LD_LIBRARY_PATH` for the Kinova driver nodes.
+
+If you need to recreate that runtime folder, run:
+
+```bash
+rosrun movo_servo_teleop_demo extract_local_kinova_sdk.sh
+```
+
+## Launch Commands
+
+For every launch below, first run:
+
+```bash
+source /opt/ros/noetic/setup.bash
+source /home/abu/Downloads/movo_arm_ws-main/devel/setup.bash
+export ROS_PACKAGE_PATH=/home/abu/Downloads/movo/movo_moveit_servo:/home/abu/Downloads/movo_arm_ws-main/src:$ROS_PACKAGE_PATH
+export CMAKE_PREFIX_PATH=/home/abu/Downloads/movo_arm_ws-main/devel:$CMAKE_PREFIX_PATH
+```
+
+RViz only:
 
 ```bash
 roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch
 ```
 
-If joystick is on a different device:
+RViz only with a different joystick device:
 
 ```bash
 roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch joy_dev:=/dev/input/js1
 ```
+
+Real drivers only, no MoveIt / RViz:
+
+```bash
+roslaunch movo_servo_teleop_demo real_kinova_dual_arms.launch local_machine_ip:=192.168.131.101
+```
+
+If you need to override the SDK library location manually:
+
+```bash
+roslaunch movo_servo_teleop_demo real_kinova_dual_arms.launch \
+  local_machine_ip:=192.168.131.101 \
+  kinova_sdk_lib_dir:=/path/to/kinova/sdk/lib
+```
+
+RViz + real arms together:
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  use_real_arms:=true \
+  local_machine_ip:=192.168.131.101
+```
+
+RViz + real arms with explicit port / serial overrides:
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  use_real_arms:=true \
+  local_machine_ip:=192.168.131.101 \
+  right_arm_ip:=192.168.131.30 \
+  left_arm_ip:=192.168.131.20 \
+  right_local_cmd_port:=25000 \
+  right_local_broadcast_port:=25005 \
+  left_local_cmd_port:=25010 \
+  left_local_broadcast_port:=25015 \
+  right_arm_serial:=PJ00900006509075-0 \
+  left_arm_serial:=PJ00900006432489-0
+```
+
+Optional standalone arm-state publishers from the Kinova side:
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  use_real_arms:=true \
+  local_machine_ip:=192.168.131.101 \
+  real_arms_use_urdf:=true
+```
+
+## Controller Guide
+
+- `A`
+  Enable motion and call real-arm `start` on both drivers.
+- `B`
+  Latch estop, publish zeros, and call real-arm `stop` on both drivers.
+- `X`
+  Toggle active teleop arm between left and right.
+- `RB`
+  Home the current active arm.
+- `LB` double tap
+  Home both arms.
+- Left stick vertical
+  Cartesian X.
+- Left stick horizontal
+  Cartesian Y.
+- Right stick vertical
+  Cartesian Z.
+- Right stick horizontal
+  Yaw.
+- D-pad up/down
+  Pitch.
+- D-pad left/right
+  Roll.
+- `RT`
+  Close gripper command for the active arm.
+- `LT`
+  Open gripper command for the active arm.
+
+## Diagnostics And Safe Identification
+
+Non-motion diagnostics:
+
+```bash
+rosrun movo_servo_teleop_demo ping_real_arm.py --arm right
+rosrun movo_servo_teleop_demo ping_real_arm.py --arm left
+```
+
+Optional small identification pulse:
+
+```bash
+rosrun movo_servo_teleop_demo ping_real_arm.py --arm right --motion
+rosrun movo_servo_teleop_demo ping_real_arm.py --arm left --motion
+```
+
+What `ping_real_arm.py` prints:
+
+- requested arm
+- target driver namespace
+- target robot IP
+- configured `local_machine_ip`
+- whether the robot IP responds to `ping`
+- whether `start`, `stop`, and `home_arm` services exist
+- whether feedback is arriving on `.../out/joint_state`
+
+Best practice for `--motion`:
+
+- Use it against `real_kinova_dual_arms.launch` by itself.
+- In the combined teleop launch, the real bridge is continuously streaming commands, so the diagnostic pulse is less isolated.
+
+## Runtime Topics And Services
+
+Real driver command topics:
+
+- `/right_arm/right_arm_driver/in/joint_velocity`
+- `/left_arm/left_arm_driver/in/joint_velocity`
+
+Real driver services:
+
+- `/right_arm/right_arm_driver/in/start`
+- `/right_arm/right_arm_driver/in/stop`
+- `/right_arm/right_arm_driver/in/home_arm`
+- `/left_arm/left_arm_driver/in/start`
+- `/left_arm/left_arm_driver/in/stop`
+- `/left_arm/left_arm_driver/in/home_arm`
+
+Status topic:
+
+```bash
+rostopic echo /movo_servo_teleop_demo/real_arm_status
+```
+
+Useful checks:
+
+```bash
+rostopic hz /right_arm/right_arm_driver/in/joint_velocity
+rostopic hz /left_arm/left_arm_driver/in/joint_velocity
+rostopic echo -n 1 /right_arm/right_arm_driver/out/joint_state
+rostopic echo -n 1 /left_arm/left_arm_driver/out/joint_state
+```
+
+## How To Test Every Requested Feature
+
+### 1. RViz-only regression check
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch
+```
+
+Verify:
+
+- RViz still loads.
+- `fake_kinova_command_bridge.py` still moves `/joint_states`.
+- Servo teleop works exactly like before.
+
+### 2. Launch guard for missing `local_machine_ip`
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch use_real_arms:=true
+```
+
+Expected:
+
+- launch fails immediately
+- error explains that `local_machine_ip:=<CURRENT_PC_IP>` is required
+
+### 3. Driver-only hardware bringup
+
+```bash
+roslaunch movo_servo_teleop_demo real_kinova_dual_arms.launch local_machine_ip:=192.168.131.101
+```
+
+Verify:
+
+- both Kinova drivers come up under the namespaced paths above
+- `ping_real_arm.py --arm right`
+- `ping_real_arm.py --arm left`
+
+### 4. Combined RViz + real hardware mode
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  use_real_arms:=true \
+  local_machine_ip:=192.168.131.101
+```
+
+Verify:
+
+- RViz still moves because the fake bridge is still active
+- `/movo_servo_teleop_demo/real_arm_status` appears
+- `/right_arm/right_arm_driver/in/joint_velocity` and `/left_arm/left_arm_driver/in/joint_velocity` publish at 100 Hz
+
+### 5. Start / stop semantics
+
+With the combined launch running:
+
+1. Press `A`
+   Expect both drivers to receive `start`.
+2. Move one arm with the sticks
+   Expect RViz motion and matching real-arm motion.
+3. Press `B`
+   Expect zero velocity streaming, real-arm `stop`, and `estop=true` in `/movo_servo_teleop_demo/real_arm_status`.
+4. Press `A` again
+   Expect motion to re-enable.
+
+### 6. Left / right isolation
+
+1. Press `X` until the right arm is active.
+2. Move the sticks.
+   Only the right real-arm namespace should see non-zero commands.
+3. Press `X` again.
+4. Move the sticks.
+   Only the left real-arm namespace should see non-zero commands.
+
+Helpful check:
+
+```bash
+rostopic echo /movo_servo_teleop_demo/real_arm_status
+```
+
+### 7. Home semantics
+
+1. Press `RB`
+   Expect only the active arm to receive `home_arm`.
+2. Double tap `LB`
+   Expect both arms to receive `home_arm`.
+
+### 8. Stale-command zeroing
+
+1. Move an arm.
+2. Release the stick.
+3. Watch the driver topic:
+
+```bash
+rostopic echo /right_arm/right_arm_driver/in/joint_velocity
+```
+
+Expected:
+
+- commands return to zero
+- bridge keeps publishing zeros at 100 Hz when commands go stale or motion is disabled
+
+## Notes On Units
+
+The real bridge explicitly converts units at the driver boundary:
+
+- MoveIt Servo input/output path in this demo uses `speed_units`
+- the demo treats Servo joint output as `rad/s`
+- classic Kinova `kinova_msgs/JointVelocity` expects `deg/s`
+
+That conversion is done in:
+
+- [`real_kinova_command_bridge.py`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/scripts/real_kinova_command_bridge.py)
+
+The fake RViz bridge remains radians-based because it integrates directly into `/joint_states`.
+
+## Assumptions Still Worth Confirming
+
+- The right/left serial-number mapping above continues to match the physical robot.
+- Gripper teleop remains RViz-side only in this package; this change focused on real-arm joint velocity streaming plus start/stop/home semantics.
+
+## Files That Avoid Stale Host-IP Assumptions
+
+These new real-arm files do **not** hardcode a machine-specific host IP:
+
+- [`config/real_arms.yaml`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/config/real_arms.yaml)
+- [`launch/movo_servo_teleop_demo.launch`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/launch/movo_servo_teleop_demo.launch)
+- [`launch/real_kinova_dual_arms.launch`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/launch/real_kinova_dual_arms.launch)
+- [`scripts/real_kinova_command_bridge.py`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/scripts/real_kinova_command_bridge.py)
+- [`scripts/ping_real_arm.py`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/scripts/ping_real_arm.py)
+
+The fixed arm IPs stay explicit because they describe the robot hardware, not the host machine:
+
+- left: `192.168.131.20`
+- right: `192.168.131.30`

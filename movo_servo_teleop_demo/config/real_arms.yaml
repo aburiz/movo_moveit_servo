@@ -1,0 +1,60 @@
+# Real-arm defaults for the classic Kinova Jaco2 Gen2 dual-arm setup.
+# local_machine_ip is intentionally blank so the launch file must supply the
+# current PC address at runtime when use_real_arms:=true.
+
+kinova_robot_type: j2s7s300
+local_machine_ip: ""
+subnet_mask: 255.255.255.0
+use_urdf: false
+feedback_publish_rate: 0.1
+respawn_driver: true
+
+bridge:
+  publish_rate_hz: 100.0
+  command_timeout_sec: 0.15
+  feedback_timeout_sec: 1.0
+  home_lockout_sec: 3.0
+  status_publish_rate_hz: 5.0
+  status_topic: /movo_servo_teleop_demo/real_arm_status
+  driver_enabled_topic: /movo_servo_teleop_demo/driver_enabled
+  estop_topic: /movo_servo_teleop_demo/estop_latched
+  home_request_topic: /movo_servo_teleop_demo/home_request
+  active_arm_topic: /movo_servo_teleop_demo/active_arm
+  right_joint_velocity_topic: /movo_servo_teleop_demo/right/joint_velocity_cmd
+  left_joint_velocity_topic: /movo_servo_teleop_demo/left/joint_velocity_cmd
+
+right_arm:
+  namespace: /right_arm
+  driver_namespace: /right_arm/right_arm_driver
+  robot_name: right_arm
+  serial_number: PJ00900006509075-0
+  robot_ip: 192.168.131.30
+  robot_port: 25000
+  local_cmd_port: 25000
+  local_broadcast_port: 25005
+  joint_names:
+    - right_shoulder_pan_joint
+    - right_shoulder_lift_joint
+    - right_arm_half_joint
+    - right_elbow_joint
+    - right_wrist_spherical_1_joint
+    - right_wrist_spherical_2_joint
+    - right_wrist_3_joint
+
+left_arm:
+  namespace: /left_arm
+  driver_namespace: /left_arm/left_arm_driver
+  robot_name: left_arm
+  serial_number: PJ00900006432489-0
+  robot_ip: 192.168.131.20
+  robot_port: 65535
+  local_cmd_port: 25010
+  local_broadcast_port: 25015
+  joint_names:
+    - left_shoulder_pan_joint
+    - left_shoulder_lift_joint
+    - left_arm_half_joint
+    - left_elbow_joint
+    - left_wrist_spherical_1_joint
+    - left_wrist_spherical_2_joint
+    - left_wrist_3_joint

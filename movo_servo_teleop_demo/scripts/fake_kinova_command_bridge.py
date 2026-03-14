@@ -12,6 +12,56 @@ class FakeKinovaCommandBridge:
     def __init__(self):
         self.publish_rate_hz = float(rospy.get_param("~publish_rate_hz", 100.0))
         self.joint_state_topic = rospy.get_param("~joint_state_topic", "/joint_states")
+        self.right_servo_joint_velocity_topic = rospy.get_param(
+            "~right_servo_joint_velocity_topic",
+            "/movo_servo_teleop_demo/right/joint_velocity_cmd",
+        )
+        self.left_servo_joint_velocity_topic = rospy.get_param(
+            "~left_servo_joint_velocity_topic",
+            "/movo_servo_teleop_demo/left/joint_velocity_cmd",
+        )
+        self.right_cartesian_velocity_topic = rospy.get_param(
+            "~right_cartesian_velocity_topic",
+            "/movo_servo_teleop_demo/right/cartesian_velocity_cmd",
+        )
+        self.left_cartesian_velocity_topic = rospy.get_param(
+            "~left_cartesian_velocity_topic",
+            "/movo_servo_teleop_demo/left/cartesian_velocity_cmd",
+        )
+        self.right_gripper_velocity_topic = rospy.get_param(
+            "~right_gripper_velocity_topic",
+            "/movo_servo_teleop_demo/right/gripper_velocity_cmd",
+        )
+        self.left_gripper_velocity_topic = rospy.get_param(
+            "~left_gripper_velocity_topic",
+            "/movo_servo_teleop_demo/left/gripper_velocity_cmd",
+        )
+        self.home_request_topic = rospy.get_param("~home_request_topic", "/movo_servo_teleop_demo/home_request")
+        self.active_arm_topic = rospy.get_param("~active_arm_topic", "/movo_servo_teleop_demo/active_arm")
+        self.right_dummy_joint_velocity_topic = rospy.get_param(
+            "~right_dummy_joint_velocity_topic",
+            "/right_arm_driver/in/joint_velocity",
+        )
+        self.left_dummy_joint_velocity_topic = rospy.get_param(
+            "~left_dummy_joint_velocity_topic",
+            "/left_arm_driver/in/joint_velocity",
+        )
+        self.right_dummy_cartesian_velocity_topic = rospy.get_param(
+            "~right_dummy_cartesian_velocity_topic",
+            "/right_arm_driver/in/cartesian_velocity",
+        )
+        self.left_dummy_cartesian_velocity_topic = rospy.get_param(
+            "~left_dummy_cartesian_velocity_topic",
+            "/left_arm_driver/in/cartesian_velocity",
+        )
+        self.right_dummy_gripper_velocity_topic = rospy.get_param(
+            "~right_dummy_gripper_velocity_topic",
+            "/right_arm_driver/in/gripper_velocity",
+        )
+        self.left_dummy_gripper_velocity_topic = rospy.get_param(
+            "~left_dummy_gripper_velocity_topic",
+            "/left_arm_driver/in/gripper_velocity",
+        )
 
         self.right_joint_names = list(rospy.get_param("~right_joint_names", []))
         self.left_joint_names = list(rospy.get_param("~left_joint_names", []))
@@ -54,62 +104,62 @@ class FakeKinovaCommandBridge:
         self.joint_state_pub = rospy.Publisher(self.joint_state_topic, JointState, queue_size=20)
 
         self.right_joint_vel_pub = rospy.Publisher(
-            "/right_arm_driver/in/joint_velocity", Float64MultiArray, queue_size=20
+            self.right_dummy_joint_velocity_topic, Float64MultiArray, queue_size=20
         )
         self.left_joint_vel_pub = rospy.Publisher(
-            "/left_arm_driver/in/joint_velocity", Float64MultiArray, queue_size=20
+            self.left_dummy_joint_velocity_topic, Float64MultiArray, queue_size=20
         )
         self.right_cart_pub = rospy.Publisher(
-            "/right_arm_driver/in/cartesian_velocity", TwistStamped, queue_size=20
+            self.right_dummy_cartesian_velocity_topic, TwistStamped, queue_size=20
         )
         self.left_cart_pub = rospy.Publisher(
-            "/left_arm_driver/in/cartesian_velocity", TwistStamped, queue_size=20
+            self.left_dummy_cartesian_velocity_topic, TwistStamped, queue_size=20
         )
         self.right_gripper_pub = rospy.Publisher(
-            "/right_arm_driver/in/gripper_velocity", Float64, queue_size=20
+            self.right_dummy_gripper_velocity_topic, Float64, queue_size=20
         )
         self.left_gripper_pub = rospy.Publisher(
-            "/left_arm_driver/in/gripper_velocity", Float64, queue_size=20
+            self.left_dummy_gripper_velocity_topic, Float64, queue_size=20
         )
 
         rospy.Subscriber(
-            "/movo_servo_teleop_demo/right/joint_velocity_cmd",
+            self.right_servo_joint_velocity_topic,
             Float64MultiArray,
             self.right_joint_vel_cb,
             queue_size=20,
         )
         rospy.Subscriber(
-            "/movo_servo_teleop_demo/left/joint_velocity_cmd",
+            self.left_servo_joint_velocity_topic,
             Float64MultiArray,
             self.left_joint_vel_cb,
             queue_size=20,
         )
         rospy.Subscriber(
-            "/movo_servo_teleop_demo/right/cartesian_velocity_cmd",
+            self.right_cartesian_velocity_topic,
             TwistStamped,
             self.right_cartesian_cb,
             queue_size=20,
         )
         rospy.Subscriber(
-            "/movo_servo_teleop_demo/left/cartesian_velocity_cmd",
+            self.left_cartesian_velocity_topic,
             TwistStamped,
             self.left_cartesian_cb,
             queue_size=20,
         )
         rospy.Subscriber(
-            "/movo_servo_teleop_demo/right/gripper_velocity_cmd",
+            self.right_gripper_velocity_topic,
             Float64,
             self.right_gripper_cb,
             queue_size=20,
         )
         rospy.Subscriber(
-            "/movo_servo_teleop_demo/left/gripper_velocity_cmd",
+            self.left_gripper_velocity_topic,
             Float64,
             self.left_gripper_cb,
             queue_size=20,
         )
-        rospy.Subscriber("/movo_servo_teleop_demo/home_request", String, self.home_request_cb, queue_size=2)
-        rospy.Subscriber("/movo_servo_teleop_demo/active_arm", String, self.active_arm_cb, queue_size=2)
+        rospy.Subscriber(self.home_request_topic, String, self.home_request_cb, queue_size=2)
+        rospy.Subscriber(self.active_arm_topic, String, self.active_arm_cb, queue_size=2)
 
         self.last_tick = rospy.Time.now()
         self.timer = rospy.Timer(rospy.Duration(1.0 / self.publish_rate_hz), self.timer_cb)
