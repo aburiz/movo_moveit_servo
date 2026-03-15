@@ -76,9 +76,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     </xacro:if>     
     
     <!-- Arms -->
-    <xacro:if value="$(optenv MOVO_HAS_KINOVA_ARM false)"> 
-    	<xacro:if value="$(optenv MOVO_HAS_KINOVA_ARM_7DOF false)">
-    		<xacro:include filename="$(find movo_description)/urdf/manipulation/jaco/jaco_7dof.urdf.xacro" />
+    <xacro:if value="$(optenv MOVO_HAS_KINOVA_ARM false)">
+        <xacro:if value="$(optenv MOVO_HAS_KINOVA_ARM_7DOF false)">
+            <xacro:include filename="$(find movo_description)/urdf/manipulation/jaco/jaco_7dof.urdf.xacro" />
             <xacro:jaco_robot_7dof prefix="right_" parent="linear_actuator_link">
             <origin xyz="0.0961046 -0.13335 0.2799937" rpy="${-M_PI/2} 0 ${-M_PI/2}"/>
             </xacro:jaco_robot_7dof>

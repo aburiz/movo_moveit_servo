@@ -3,10 +3,11 @@
 import argparse
 import subprocess
 
+import actionlib
 import rospy
 import rosservice
-from kinova_msgs.msg import JointVelocity
-from kinova_msgs.srv import HomeArm, Start, Stop
+from kinova_msgs.msg import ArmJointAnglesAction, JointVelocity
+from kinova_msgs.srv import Start, Stop
 from sensor_msgs.msg import JointState
 
 
@@ -47,6 +48,13 @@ def make_joint_velocity(joint_index, velocity_deg_s):
     return msg
 
 
+def load_joint_velocity_signs(config_namespace, arm_name):
+    raw_signs = list(cfg(config_namespace, "{0}_arm/joint_velocity_signs".format(arm_name), [-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]))
+    if len(raw_signs) != 7:
+        raw_signs = [-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    return [float(value) for value in raw_signs]
+
+
 def main():
     parser = argparse.ArgumentParser(description="Ping and optionally identify a real MOVO Kinova arm.")
     parser.add_argument("--arm", required=True, choices=["left", "right"], help="Arm to inspect.")
@@ -74,10 +82,12 @@ def main():
     target_ip = str(cfg(config_namespace, "{0}_arm/robot_ip".format(arm_name), "")).strip()
     other_target_ip = str(cfg(config_namespace, "{0}_arm/robot_ip".format(other_arm), "")).strip()
     local_machine_ip = str(cfg(config_namespace, "local_machine_ip", "")).strip()
+    joint_velocity_signs = load_joint_velocity_signs(config_namespace, arm_name)
 
     start_service_name = driver_namespace + "/in/start"
     stop_service_name = driver_namespace + "/in/stop"
     home_service_name = driver_namespace + "/in/home_arm"
+    home_action_name = driver_namespace + "/joints_action/joint_angles"
     feedback_topic = driver_namespace + "/out/joint_state"
     joint_velocity_topic = driver_namespace + "/in/joint_velocity"
 
@@ -86,6 +96,8 @@ def main():
     print("Target driver namespace: {0}".format(driver_namespace))
     print("Target IP: {0}".format(target_ip))
     print("Configured local machine IP: {0}".format(local_machine_ip or "<unset>"))
+    print("Custom home action: {0}".format(home_action_name))
+    print("Joint velocity signs: {0}".format(joint_velocity_signs))
     print(
         "Expected opposite-arm mapping: {0} -> {1} -> {2}".format(
             other_arm, other_driver_namespace or "<unset>", other_target_ip or "<unset>"
@@ -108,10 +120,13 @@ def main():
         "stop": stop_service_name in service_list,
         "home": home_service_name in service_list,
     }
+    home_action_client = actionlib.SimpleActionClient(home_action_name, ArmJointAnglesAction)
+    home_action_present = home_action_client.wait_for_server(rospy.Duration(args.timeout))
     print("Start service present: {0}".format("yes" if service_present["start"] else "no"))
     print("Stop service present: {0}".format("yes" if service_present["stop"] else "no"))
-    print("Home service present: {0}".format("yes" if service_present["home"] else "no"))
-    print("Driver reachable: {0}".format("yes" if any(service_present.values()) else "no"))
+    print("Custom home action present: {0}".format("yes" if home_action_present else "no"))
+    print("Stock home service present (unused by teleop home): {0}".format("yes" if service_present["home"] else "no"))
+    print("Driver reachable: {0}".format("yes" if (service_present["start"] or service_present["stop"] or home_action_present) else "no"))
 
     feedback_received = False
     try:
@@ -130,13 +145,11 @@ def main():
     print("Motion mode requested. This sends a small pulse to {0} joint{1}.".format(arm_name, args.motion_joint))
     print("If the opposite physical arm moves, the namespace/IP/serial mapping is reversed.")
 
-    if not all(service_present.values()):
-        raise SystemExit("Motion pulse aborted because start/stop/home services are not all available.")
+    if not (service_present["start"] and service_present["stop"]):
+        raise SystemExit("Motion pulse aborted because start/stop services are not both available.")
 
     start_proxy = rospy.ServiceProxy(start_service_name, Start)
     stop_proxy = rospy.ServiceProxy(stop_service_name, Stop)
-    home_proxy = rospy.ServiceProxy(home_service_name, HomeArm)
-    _ = home_proxy  # Keep a proxy ready so users can see the service was resolved for this arm.
     publisher = rospy.Publisher(joint_velocity_topic, JointVelocity, queue_size=1)
     rospy.sleep(0.25)
 
@@ -145,7 +158,8 @@ def main():
     except rospy.ServiceException as exc:
         raise SystemExit("Failed to call start on {0}: {1}".format(start_service_name, exc))
 
-    pulse_msg = make_joint_velocity(args.motion_joint - 1, args.motion_velocity_deg_s)
+    pulse_velocity = joint_velocity_signs[args.motion_joint - 1] * args.motion_velocity_deg_s
+    pulse_msg = make_joint_velocity(args.motion_joint - 1, pulse_velocity)
     zero_msg = make_joint_velocity(args.motion_joint - 1, 0.0)
     rate = rospy.Rate(100)
     iterations = max(1, int(round(args.motion_duration * 100.0)))

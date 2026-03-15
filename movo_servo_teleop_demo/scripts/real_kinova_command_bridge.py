@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
+import actionlib
 import math
 import threading
 
 import rospy
 import rosservice
+from actionlib_msgs.msg import GoalStatus
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
-from kinova_msgs.msg import JointVelocity
-from kinova_msgs.srv import HomeArm, Start, Stop
+from kinova_msgs.msg import ArmJointAnglesAction, ArmJointAnglesGoal, JointVelocity
+from kinova_msgs.srv import Start, Stop
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool, Float64MultiArray, String
 
@@ -21,6 +23,8 @@ class RealKinovaCommandBridge:
         self.command_timeout_sec = float(self.cfg("bridge/command_timeout_sec", 0.15))
         self.feedback_timeout_sec = float(self.cfg("bridge/feedback_timeout_sec", 1.0))
         self.home_lockout_sec = float(self.cfg("bridge/home_lockout_sec", 3.0))
+        self.home_action_server_timeout_sec = float(self.cfg("bridge/home_action_server_timeout_sec", 1.0))
+        self.home_action_result_timeout_sec = float(self.cfg("bridge/home_action_result_timeout_sec", 45.0))
         self.status_publish_rate_hz = float(self.cfg("bridge/status_publish_rate_hz", 5.0))
         self.status_topic = self.cfg("bridge/status_topic", "/movo_servo_teleop_demo/real_arm_status")
         self.driver_enabled_topic = self.cfg("bridge/driver_enabled_topic", "/movo_servo_teleop_demo/driver_enabled")
@@ -72,6 +76,7 @@ class RealKinovaCommandBridge:
         rospy.loginfo(
             "Servo joint velocities are treated as rad/s and converted to deg/s for kinova_msgs/JointVelocity."
         )
+        rospy.loginfo("Home requests use configured custom joint-angle goals via the Kinova joint-angle action server.")
 
     def cfg(self, key, default=None):
         full_name = "{}/{}".format(self.config_namespace, key)
@@ -84,6 +89,8 @@ class RealKinovaCommandBridge:
         target_ip = str(self.cfg("{0}_arm/robot_ip".format(arm_name), "")).strip()
         robot_name = str(self.cfg("{0}_arm/robot_name".format(arm_name), "{0}_arm".format(arm_name))).strip()
         joint_names = list(self.cfg("{0}_arm/joint_names".format(arm_name), []))
+        home_joint_angles_deg = self.parse_home_joint_angles_deg(arm_name)
+        joint_velocity_signs = self.parse_joint_velocity_signs(arm_name)
         if len(joint_names) != 7:
             rospy.logwarn(
                 "%s arm joint_names expected 7 entries for a Jaco2 7-DOF arm, got %d",
@@ -97,6 +104,7 @@ class RealKinovaCommandBridge:
             "driver_namespace": driver_namespace,
             "target_ip": target_ip,
             "joint_names": joint_names,
+            "joint_velocity_signs": joint_velocity_signs,
             "cmd_rad_s": [0.0] * 7,
             "last_cmd_time": rospy.Time(0),
             "last_feedback_time": rospy.Time(0),
@@ -107,13 +115,16 @@ class RealKinovaCommandBridge:
             "latest_max_abs_deg_s": 0.0,
             "start_service_name": driver_namespace + "/in/start",
             "stop_service_name": driver_namespace + "/in/stop",
-            "home_service_name": driver_namespace + "/in/home_arm",
+            "home_action_name": driver_namespace + "/joints_action/joint_angles",
             "feedback_topic": driver_namespace + "/out/joint_state",
+            "home_joint_angles_deg": home_joint_angles_deg,
+            "home_in_progress": False,
+            "last_home_result": "idle",
         }
         state["pub"] = rospy.Publisher(driver_namespace + "/in/joint_velocity", JointVelocity, queue_size=1)
         state["start_proxy"] = rospy.ServiceProxy(state["start_service_name"], Start)
         state["stop_proxy"] = rospy.ServiceProxy(state["stop_service_name"], Stop)
-        state["home_proxy"] = rospy.ServiceProxy(state["home_service_name"], HomeArm)
+        state["home_client"] = actionlib.SimpleActionClient(state["home_action_name"], ArmJointAnglesAction)
         state["feedback_sub"] = rospy.Subscriber(
             state["feedback_topic"],
             JointState,
@@ -121,6 +132,36 @@ class RealKinovaCommandBridge:
             queue_size=10,
         )
         return state
+
+    def parse_home_joint_angles_deg(self, arm_name):
+        raw_angles = self.cfg("{0}_arm/home_joint_angles_deg".format(arm_name), {})
+        ordered_angles = []
+        missing = []
+        for idx in range(7):
+            key = "joint{0}".format(idx + 1)
+            if key not in raw_angles:
+                missing.append(key)
+                continue
+            ordered_angles.append(float(raw_angles[key]))
+        if missing:
+            rospy.logwarn(
+                "%s arm custom home pose is missing %s; home requests for this arm will be ignored.",
+                arm_name,
+                ", ".join(missing),
+            )
+            return []
+        return ordered_angles
+
+    def parse_joint_velocity_signs(self, arm_name):
+        raw_signs = list(self.cfg("{0}_arm/joint_velocity_signs".format(arm_name), [-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]))
+        if len(raw_signs) != 7:
+            rospy.logwarn(
+                "%s arm joint_velocity_signs expected 7 entries, got %d. Falling back to actuator-1 inversion only.",
+                arm_name,
+                len(raw_signs),
+            )
+            raw_signs = [-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        return [float(value) for value in raw_signs]
 
     @staticmethod
     def normalize_arm_name(raw_name):
@@ -216,15 +257,30 @@ class RealKinovaCommandBridge:
             return
 
         targets = ("left", "right") if requested == "both" else (requested,)
-        now = rospy.Time.now()
-
         with self.lock:
+            if self.estop_latched:
+                rospy.logwarn("Ignoring custom home request while estop is latched.")
+                return
+
             for arm_name in targets:
-                self.arms[arm_name]["home_lockout_until"] = now + rospy.Duration(self.home_lockout_sec)
+                arm_state = self.arms[arm_name]
+                if arm_state["home_in_progress"]:
+                    rospy.logwarn("Ignoring %s arm home request because a custom home is already in progress.", arm_name)
+                    return
+                if len(arm_state["home_joint_angles_deg"]) != 7:
+                    rospy.logwarn("Ignoring %s arm home request because no complete custom home pose is configured.", arm_name)
+                    return
+
+            for arm_name in targets:
+                arm_state = self.arms[arm_name]
+                arm_state["home_in_progress"] = True
+                arm_state["last_home_result"] = "running"
 
         self.publish_zero_once()
         for arm_name in targets:
-            self.call_service(arm_name, "home")
+            thread = threading.Thread(target=self.execute_custom_home, args=(arm_name,))
+            thread.daemon = True
+            thread.start()
 
     def call_service_for_all(self, service_kind):
         for arm_name in ("right", "left"):
@@ -256,6 +312,69 @@ class RealKinovaCommandBridge:
             rospy.logwarn("Service call failed for %s arm (%s): %s", arm_name, service_name, exc)
             return False
 
+    @staticmethod
+    def make_joint_angles_goal(command_deg):
+        goal = ArmJointAnglesGoal()
+        padded = RealKinovaCommandBridge.resize_command(command_deg, 7)
+        for idx, value in enumerate(padded):
+            setattr(goal.angles, "joint{0}".format(idx + 1), float(value))
+        return goal
+
+    def execute_custom_home(self, arm_name):
+        try:
+            with self.lock:
+                arm_state = self.arms[arm_name]
+                target_deg = list(arm_state["home_joint_angles_deg"])
+                action_name = arm_state["home_action_name"]
+                action_client = arm_state["home_client"]
+
+            if not self.call_service(arm_name, "start"):
+                with self.lock:
+                    self.arms[arm_name]["last_home_result"] = "start_failed"
+                return
+
+            if not action_client.wait_for_server(rospy.Duration(self.home_action_server_timeout_sec)):
+                rospy.logwarn("Custom home action unavailable for %s arm: %s", arm_name, action_name)
+                with self.lock:
+                    self.arms[arm_name]["last_home_result"] = "action_unavailable"
+                return
+
+            goal = self.make_joint_angles_goal(target_deg)
+            rospy.loginfo("Sending custom home pose to %s arm via %s: %s", arm_name, action_name, target_deg)
+            action_client.send_goal(goal)
+
+            finished = action_client.wait_for_result(rospy.Duration(self.home_action_result_timeout_sec))
+            if not finished:
+                rospy.logwarn("Custom home timed out for %s arm after %.1f s", arm_name, self.home_action_result_timeout_sec)
+                action_client.cancel_goal()
+                with self.lock:
+                    self.arms[arm_name]["last_home_result"] = "timeout"
+                return
+
+            goal_state = action_client.get_state()
+            if goal_state == GoalStatus.SUCCEEDED:
+                rospy.loginfo("Custom home reached for %s arm", arm_name)
+                with self.lock:
+                    self.arms[arm_name]["last_home_result"] = "succeeded"
+            else:
+                rospy.logwarn(
+                    "Custom home did not succeed for %s arm (action state=%s)",
+                    arm_name,
+                    str(goal_state),
+                )
+                with self.lock:
+                    self.arms[arm_name]["last_home_result"] = "action_state_{0}".format(goal_state)
+        finally:
+            self.publish_zero_once()
+            with self.lock:
+                should_restore_stop = not self.driver_enabled
+            if should_restore_stop:
+                self.call_service(arm_name, "stop")
+            with self.lock:
+                arm_state = self.arms[arm_name]
+                arm_state["home_in_progress"] = False
+                arm_state["home_lockout_until"] = rospy.Time.now() + rospy.Duration(self.home_lockout_sec)
+
     def publish_zero_once(self):
         zero_msg = self.make_joint_velocity_msg([0.0] * 7)
         with self.lock:
@@ -278,11 +397,14 @@ class RealKinovaCommandBridge:
                     command_age = (now - arm_state["last_cmd_time"]).to_sec()
 
                 command_is_fresh = command_age <= self.command_timeout_sec
-                lockout_active = now < arm_state["home_lockout_until"]
+                lockout_active = arm_state["home_in_progress"] or (now < arm_state["home_lockout_until"])
                 use_command = enabled and command_is_fresh and not lockout_active
 
                 command_rad_s = list(arm_state["cmd_rad_s"]) if use_command else [0.0] * 7
-                command_deg_s = [math.degrees(value) for value in command_rad_s]
+                signed_command_rad_s = [
+                    arm_state["joint_velocity_signs"][idx] * command_rad_s[idx] for idx in range(len(command_rad_s))
+                ]
+                command_deg_s = [math.degrees(value) for value in signed_command_rad_s]
                 arm_state["latest_max_abs_deg_s"] = max([abs(value) for value in command_deg_s] or [0.0])
                 commands_to_publish.append((arm_state["pub"], self.make_joint_velocity_msg(command_deg_s)))
 
@@ -304,8 +426,8 @@ class RealKinovaCommandBridge:
                 service_present = {
                     "start": arm_state["start_service_name"] in service_names,
                     "stop": arm_state["stop_service_name"] in service_names,
-                    "home": arm_state["home_service_name"] in service_names,
                 }
+                home_action_connected = arm_state["home_client"].wait_for_server(rospy.Duration(0.0))
 
                 if arm_state["feedback_received"]:
                     feedback_age = (now - arm_state["last_feedback_time"]).to_sec()
@@ -322,7 +444,10 @@ class RealKinovaCommandBridge:
                 status.name = "movo_servo_teleop_demo/{0}_arm".format(arm_name)
                 status.hardware_id = arm_state["target_ip"] or arm_state["driver_namespace"]
 
-                if self.estop_latched:
+                if arm_state["home_in_progress"]:
+                    status.level = DiagnosticStatus.WARN
+                    status.message = "Custom home in progress"
+                elif self.estop_latched:
                     status.level = DiagnosticStatus.WARN
                     status.message = "ROS estop latched"
                 elif not self.driver_enabled:
@@ -349,10 +474,17 @@ class RealKinovaCommandBridge:
                     KeyValue("started", str(bool(arm_state["started"])).lower()),
                     KeyValue("estop", str(bool(self.estop_latched)).lower()),
                     KeyValue("feedback_received", str(bool(arm_state["feedback_received"])).lower()),
-                    KeyValue("home_lockout_active", str(bool(now < arm_state["home_lockout_until"])).lower()),
+                    KeyValue(
+                        "home_lockout_active",
+                        str(bool(arm_state["home_in_progress"] or (now < arm_state["home_lockout_until"]))).lower(),
+                    ),
+                    KeyValue("home_in_progress", str(bool(arm_state["home_in_progress"])).lower()),
                     KeyValue("start_service_present", str(bool(service_present["start"])).lower()),
                     KeyValue("stop_service_present", str(bool(service_present["stop"])).lower()),
-                    KeyValue("home_service_present", str(bool(service_present["home"])).lower()),
+                    KeyValue("custom_home_action", arm_state["home_action_name"]),
+                    KeyValue("custom_home_action_connected", str(bool(home_action_connected)).lower()),
+                    KeyValue("custom_home_configured", str(bool(len(arm_state["home_joint_angles_deg"]) == 7)).lower()),
+                    KeyValue("last_home_result", arm_state["last_home_result"]),
                     KeyValue(
                         "last_command_age_sec",
                         "{0:.3f}".format(command_age) if math.isfinite(command_age) else "inf",

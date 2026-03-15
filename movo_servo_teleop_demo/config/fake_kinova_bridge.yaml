@@ -27,21 +27,21 @@ left_gripper_home_position: 0.0
 # If provided, fake_kinova_command_bridge converts these to MOVO ROS joint coordinates
 # using the same offset/wrapping path as movo_joint_interface.
 right_home_native_degrees:
-  joint1: 86.39
+  joint1: 268.94
   joint2: 82.92
   joint3: 190.84
-  joint4: 310.59
+  joint4: 322.63
   joint5: 190.75
-  joint6: 180.69
+  joint6: 142.04
   joint7: 180.00
 
 left_home_native_degrees:
-  joint1: 274.61
+  joint1: 91.06
   joint2: 277.08
   joint3: 169.16
-  joint4: 49.41
+  joint4: 37.37
   joint5: 169.25
-  joint6: 179.31
+  joint6: 217.96
   joint7: 180.00
 
 right_joint_names:
@@ -70,24 +70,25 @@ other_joint_names:
   - right_gripper_finger1_joint
 
 # Custom home from user (degrees):
-# right: (266.39, 82.92, 190.84, 310.59, 190.75, 180.69, 180.00)
-# left:  (94.61, 277.08, 169.16, 49.41, 169.25, 179.31, 180.00)
+# right: (268.94, 82.92, 190.84, 322.63, 190.75, 142.04, 180.00)
+# left:  (91.06, 277.08, 169.16, 37.37, 169.25, 217.96, 180.00)
 # Stored below as converted MOVO ROS joint coordinates (radians).
 # These are kept as fallback if native-degree fields are removed.
+# A1 is physically flipped relative to the legacy sim model, so joint1 is negated here.
 right_home_positions:
-  right_shoulder_pan_joint: 1.507790
+  right_shoulder_pan_joint: 1.589297
   right_shoulder_lift_joint: -1.694366
   right_arm_half_joint: -2.952399
-  right_elbow_joint: 2.279225
+  right_elbow_joint: 2.489363
   right_wrist_spherical_1_joint: -2.953970
-  right_wrist_spherical_2_joint: 0.012043
+  right_wrist_spherical_2_joint: -0.662527
   right_wrist_3_joint: -3.141593
 
 left_home_positions:
-  left_shoulder_pan_joint: -1.490337
+  left_shoulder_pan_joint: -1.589297
   left_shoulder_lift_joint: 1.694366
   left_arm_half_joint: 2.952399
-  left_elbow_joint: -2.279225
+  left_elbow_joint: -2.489363
   left_wrist_spherical_1_joint: 2.953970
-  left_wrist_spherical_2_joint: -0.012043
+  left_wrist_spherical_2_joint: 0.662527
   left_wrist_3_joint: -3.141593

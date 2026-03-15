@@ -159,9 +159,9 @@ roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
 - `X`
   Toggle active teleop arm between left and right.
 - `RB`
-  Home the current active arm.
+  Move the current active arm to the configured custom home joint pose.
 - `LB` double tap
-  Home both arms.
+  Move both arms to the configured custom home joint poses.
 - Left stick vertical
   Cartesian X.
 - Left stick horizontal
@@ -202,13 +202,22 @@ What `ping_real_arm.py` prints:
 - target robot IP
 - configured `local_machine_ip`
 - whether the robot IP responds to `ping`
-- whether `start`, `stop`, and `home_arm` services exist
+- whether `start` and `stop` services exist
+- whether the custom home joint-angle action exists
 - whether feedback is arriving on `.../out/joint_state`
 
 Best practice for `--motion`:
 
 - Use it against `real_kinova_dual_arms.launch` by itself.
 - In the combined teleop launch, the real bridge is continuously streaming commands, so the diagnostic pulse is less isolated.
+
+## Actuator-1 Correction
+
+Only actuator 1 is corrected now.
+
+- The MOVO URDF and MoveIt model stay on the legacy geometry.
+- The real-arm bridge flips joint 1 velocity before publishing to the Kinova driver.
+- The fake RViz bridge negates joint 1 when converting custom home angles from Kinova native degrees so the simulated home pose still matches the real robot.
 
 ## Runtime Topics And Services
 
@@ -221,10 +230,13 @@ Real driver services:
 
 - `/right_arm/right_arm_driver/in/start`
 - `/right_arm/right_arm_driver/in/stop`
-- `/right_arm/right_arm_driver/in/home_arm`
 - `/left_arm/left_arm_driver/in/start`
 - `/left_arm/left_arm_driver/in/stop`
-- `/left_arm/left_arm_driver/in/home_arm`
+
+Custom home actions used by the teleop bridge:
+
+- `/right_arm/right_arm_driver/joints_action/joint_angles`
+- `/left_arm/left_arm_driver/joints_action/joint_angles`
 
 Status topic:
 
@@ -323,9 +335,14 @@ rostopic echo /movo_servo_teleop_demo/real_arm_status
 ### 7. Home semantics
 
 1. Press `RB`
-   Expect only the active arm to receive `home_arm`.
+   Expect only the active arm to receive a custom joint-angle goal.
 2. Double tap `LB`
-   Expect both arms to receive `home_arm`.
+   Expect both arms to receive their configured custom joint-angle goals.
+
+Configured custom home joint angles in Kinova native degrees:
+
+- Right: `268.94, 82.92, 190.84, 322.63, 190.75, 142.04, 180.00`
+- Left: `91.06, 277.08, 169.16, 37.37, 169.25, 217.96, 180.00`
 
 ### 8. Stale-command zeroing
 
@@ -359,7 +376,7 @@ The fake RViz bridge remains radians-based because it integrates directly into `
 ## Assumptions Still Worth Confirming
 
 - The right/left serial-number mapping above continues to match the physical robot.
-- Gripper teleop remains RViz-side only in this package; this change focused on real-arm joint velocity streaming plus start/stop/home semantics.
+- Gripper teleop remains RViz-side only in this package; this change focused on real-arm joint velocity streaming plus start/stop/custom-home semantics.
 
 ## Files That Avoid Stale Host-IP Assumptions
 

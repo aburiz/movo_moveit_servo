@@ -14,6 +14,8 @@ bridge:
   command_timeout_sec: 0.15
   feedback_timeout_sec: 1.0
   home_lockout_sec: 3.0
+  home_action_server_timeout_sec: 1.0
+  home_action_result_timeout_sec: 45.0
   status_publish_rate_hz: 5.0
   status_topic: /movo_servo_teleop_demo/real_arm_status
   driver_enabled_topic: /movo_servo_teleop_demo/driver_enabled
@@ -32,6 +34,15 @@ right_arm:
   robot_port: 25000
   local_cmd_port: 25000
   local_broadcast_port: 25005
+  joint_velocity_signs: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+  home_joint_angles_deg:
+    joint1: 268.94
+    joint2: 82.92
+    joint3: 190.84
+    joint4: 322.63
+    joint5: 190.75
+    joint6: 142.04
+    joint7: 180.00
   joint_names:
     - right_shoulder_pan_joint
     - right_shoulder_lift_joint
@@ -50,6 +61,15 @@ left_arm:
   robot_port: 65535
   local_cmd_port: 25010
   local_broadcast_port: 25015
+  joint_velocity_signs: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+  home_joint_angles_deg:
+    joint1: 91.06
+    joint2: 277.08
+    joint3: 169.16
+    joint4: 37.37
+    joint5: 169.25
+    joint6: 217.96
+    joint7: 180.00
   joint_names:
     - left_shoulder_pan_joint
     - left_shoulder_lift_joint

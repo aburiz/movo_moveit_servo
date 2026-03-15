@@ -198,7 +198,7 @@ class FakeKinovaCommandBridge:
             # Match conversion in movo_joint_interface:
             # kinova_api_wrapper.get_angular_position() + jaco_joint_controller._update_controller_data().
             mapped = [
-                math.radians(ordered_degrees[0]),
+                -math.radians(ordered_degrees[0]),
                 math.radians(ordered_degrees[1] - 180.0),
                 math.radians(ordered_degrees[2]),
                 math.radians(ordered_degrees[3] - 180.0),
@@ -206,11 +206,12 @@ class FakeKinovaCommandBridge:
                 math.radians(ordered_degrees[5] - 180.0),
                 math.radians(ordered_degrees[6]),
             ]
+            # A1 is physically flipped relative to the legacy sim model.
             for i in (0, 2, 4, 6):
                 mapped[i] = self.wrap_angle(mapped[i])
         elif n == 6:
             mapped = [
-                math.radians(ordered_degrees[0]),
+                -math.radians(ordered_degrees[0]),
                 math.radians(ordered_degrees[1] - 180.0),
                 math.radians(ordered_degrees[2] - 180.0),
                 math.radians(ordered_degrees[3]),
