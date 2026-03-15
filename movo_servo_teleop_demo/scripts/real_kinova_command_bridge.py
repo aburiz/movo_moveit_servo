@@ -9,7 +9,7 @@ import rosservice
 from actionlib_msgs.msg import GoalStatus
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 from kinova_msgs.msg import ArmJointAnglesAction, ArmJointAnglesGoal, JointVelocity
-from kinova_msgs.srv import Start, Stop
+from kinova_msgs.srv import ClearTrajectories, Start, Stop
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool, Float64MultiArray, String
 
@@ -22,9 +22,11 @@ class RealKinovaCommandBridge:
         self.publish_rate_hz = float(self.cfg("bridge/publish_rate_hz", 100.0))
         self.command_timeout_sec = float(self.cfg("bridge/command_timeout_sec", 0.15))
         self.feedback_timeout_sec = float(self.cfg("bridge/feedback_timeout_sec", 1.0))
-        self.home_lockout_sec = float(self.cfg("bridge/home_lockout_sec", 3.0))
+        self.home_lockout_sec = float(self.cfg("bridge/home_lockout_sec", 0.0))
         self.home_action_server_timeout_sec = float(self.cfg("bridge/home_action_server_timeout_sec", 1.0))
         self.home_action_result_timeout_sec = float(self.cfg("bridge/home_action_result_timeout_sec", 45.0))
+        self.post_home_clear_trajectories = bool(self.cfg("bridge/post_home_clear_trajectories", True))
+        self.post_home_clear_delay_sec = float(self.cfg("bridge/post_home_clear_delay_sec", 0.2))
         self.status_publish_rate_hz = float(self.cfg("bridge/status_publish_rate_hz", 5.0))
         self.status_topic = self.cfg("bridge/status_topic", "/movo_servo_teleop_demo/real_arm_status")
         self.driver_enabled_topic = self.cfg("bridge/driver_enabled_topic", "/movo_servo_teleop_demo/driver_enabled")
@@ -115,6 +117,7 @@ class RealKinovaCommandBridge:
             "latest_max_abs_deg_s": 0.0,
             "start_service_name": driver_namespace + "/in/start",
             "stop_service_name": driver_namespace + "/in/stop",
+            "clear_service_name": driver_namespace + "/in/clear_trajectories",
             "home_action_name": driver_namespace + "/joints_action/joint_angles",
             "feedback_topic": driver_namespace + "/out/joint_state",
             "home_joint_angles_deg": home_joint_angles_deg,
@@ -124,6 +127,7 @@ class RealKinovaCommandBridge:
         state["pub"] = rospy.Publisher(driver_namespace + "/in/joint_velocity", JointVelocity, queue_size=1)
         state["start_proxy"] = rospy.ServiceProxy(state["start_service_name"], Start)
         state["stop_proxy"] = rospy.ServiceProxy(state["stop_service_name"], Stop)
+        state["clear_proxy"] = rospy.ServiceProxy(state["clear_service_name"], ClearTrajectories)
         state["home_client"] = actionlib.SimpleActionClient(state["home_action_name"], ArmJointAnglesAction)
         state["feedback_sub"] = rospy.Subscriber(
             state["feedback_topic"],
@@ -307,6 +311,8 @@ class RealKinovaCommandBridge:
             elif service_kind == "stop":
                 with self.lock:
                     arm_state["started"] = False
+            elif service_kind == "clear":
+                rospy.loginfo("Cleared queued trajectories on %s arm via %s", arm_name, service_name)
             return True
         except rospy.ServiceException as exc:
             rospy.logwarn("Service call failed for %s arm (%s): %s", arm_name, service_name, exc)
@@ -366,6 +372,11 @@ class RealKinovaCommandBridge:
                     self.arms[arm_name]["last_home_result"] = "action_state_{0}".format(goal_state)
         finally:
             self.publish_zero_once()
+            if self.post_home_clear_trajectories:
+                if self.post_home_clear_delay_sec > 0.0:
+                    rospy.sleep(self.post_home_clear_delay_sec)
+                self.call_service(arm_name, "clear")
+                self.publish_zero_once()
             with self.lock:
                 should_restore_stop = not self.driver_enabled
             if should_restore_stop:
@@ -373,7 +384,10 @@ class RealKinovaCommandBridge:
             with self.lock:
                 arm_state = self.arms[arm_name]
                 arm_state["home_in_progress"] = False
-                arm_state["home_lockout_until"] = rospy.Time.now() + rospy.Duration(self.home_lockout_sec)
+                if self.home_lockout_sec > 0.0:
+                    arm_state["home_lockout_until"] = rospy.Time.now() + rospy.Duration(self.home_lockout_sec)
+                else:
+                    arm_state["home_lockout_until"] = rospy.Time(0)
 
     def publish_zero_once(self):
         zero_msg = self.make_joint_velocity_msg([0.0] * 7)
@@ -426,6 +440,7 @@ class RealKinovaCommandBridge:
                 service_present = {
                     "start": arm_state["start_service_name"] in service_names,
                     "stop": arm_state["stop_service_name"] in service_names,
+                    "clear": arm_state["clear_service_name"] in service_names,
                 }
                 home_action_connected = arm_state["home_client"].wait_for_server(rospy.Duration(0.0))
 
@@ -453,7 +468,7 @@ class RealKinovaCommandBridge:
                 elif not self.driver_enabled:
                     status.level = DiagnosticStatus.WARN
                     status.message = "Waiting for start command"
-                elif not all(service_present.values()):
+                elif not service_present["start"] or not service_present["stop"]:
                     status.level = DiagnosticStatus.ERROR
                     status.message = "Driver services missing"
                 elif not connected:
@@ -481,6 +496,7 @@ class RealKinovaCommandBridge:
                     KeyValue("home_in_progress", str(bool(arm_state["home_in_progress"])).lower()),
                     KeyValue("start_service_present", str(bool(service_present["start"])).lower()),
                     KeyValue("stop_service_present", str(bool(service_present["stop"])).lower()),
+                    KeyValue("clear_trajectories_service_present", str(bool(service_present["clear"])).lower()),
                     KeyValue("custom_home_action", arm_state["home_action_name"]),
                     KeyValue("custom_home_action_connected", str(bool(home_action_connected)).lower()),
                     KeyValue("custom_home_configured", str(bool(len(arm_state["home_joint_angles_deg"]) == 7)).lower()),

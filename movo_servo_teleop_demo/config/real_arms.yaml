@@ -13,9 +13,11 @@ bridge:
   publish_rate_hz: 100.0
   command_timeout_sec: 0.15
   feedback_timeout_sec: 1.0
-  home_lockout_sec: 3.0
+  home_lockout_sec: 0.0
   home_action_server_timeout_sec: 1.0
   home_action_result_timeout_sec: 45.0
+  post_home_clear_trajectories: true
+  post_home_clear_delay_sec: 0.2
   status_publish_rate_hz: 5.0
   status_topic: /movo_servo_teleop_demo/real_arm_status
   driver_enabled_topic: /movo_servo_teleop_demo/driver_enabled

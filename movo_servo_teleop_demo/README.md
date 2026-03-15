@@ -373,6 +373,16 @@ That conversion is done in:
 
 The fake RViz bridge remains radians-based because it integrates directly into `/joint_states`.
 
+## Home Recovery Behavior
+
+- The real bridge no longer adds a post-home command lockout. As soon as the custom home action finishes, new teleop commands can flow again.
+- The real bridge now also clears the Kinova driver trajectory FIFO after custom home, because the stock joint-angle action leaves a queued hold that can make the physical arm lag behind RViz.
+- The fake RViz bridge no longer teleports instantly to home by default. It blends to the configured home pose over `home_transition_duration_sec` so MoveIt Servo sees a smoother `/joint_states` change.
+- Current defaults:
+  - [`config/real_arms.yaml`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/config/real_arms.yaml) sets `bridge.home_lockout_sec: 0.0`
+  - [`config/real_arms.yaml`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/config/real_arms.yaml) sets `bridge.post_home_clear_trajectories: true` and `bridge.post_home_clear_delay_sec: 0.2`
+  - [`config/fake_kinova_bridge.yaml`](/home/abu/Downloads/movo/movo_moveit_servo/movo_servo_teleop_demo/config/fake_kinova_bridge.yaml) sets `home_transition_duration_sec: 0.75`
+
 ## Assumptions Still Worth Confirming
 
 - The right/left serial-number mapping above continues to match the physical robot.

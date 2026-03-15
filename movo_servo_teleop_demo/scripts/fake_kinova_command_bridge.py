@@ -78,12 +78,17 @@ class FakeKinovaCommandBridge:
         self.gripper_max_position = float(rospy.get_param("~gripper_max_position", 0.986111027))
         self.right_gripper_home_position = float(rospy.get_param("~right_gripper_home_position", 0.0))
         self.left_gripper_home_position = float(rospy.get_param("~left_gripper_home_position", 0.0))
+        self.home_transition_duration_sec = float(rospy.get_param("~home_transition_duration_sec", 0.75))
 
         self.right_cmd = [0.0 for _ in self.right_joint_names]
         self.left_cmd = [0.0 for _ in self.left_joint_names]
         self.right_gripper_cmd = 0.0
         self.left_gripper_cmd = 0.0
         self.active_arm = "right"
+        self.home_transition = {
+            "right": None,
+            "left": None,
+        }
 
         self.joint_positions = {}
         self.ensure_joint_in_other_names(self.right_gripper_joint)
@@ -98,8 +103,8 @@ class FakeKinovaCommandBridge:
             "left", self.left_joint_names, self.left_home, self.left_home_native_degrees
         )
 
-        self.apply_home("right")
-        self.apply_home("left")
+        self.apply_home("right", instant=True)
+        self.apply_home("left", instant=True)
 
         self.joint_state_pub = rospy.Publisher(self.joint_state_topic, JointState, queue_size=20)
 
@@ -166,15 +171,65 @@ class FakeKinovaCommandBridge:
 
         rospy.loginfo("Fake Kinova bridge publishing joint states on %s", self.joint_state_topic)
 
-    def apply_home(self, arm_name):
+    def apply_home(self, arm_name, instant=False):
+        target_positions = {}
+        target_gripper = 0.0
         if arm_name == "right":
-            for joint, value in self.right_home.items():
-                self.joint_positions[joint] = float(value)
-            self.joint_positions[self.right_gripper_joint] = self.right_gripper_home_position
+            target_positions = {joint: float(value) for joint, value in self.right_home.items()}
+            target_gripper = self.right_gripper_home_position
         elif arm_name == "left":
-            for joint, value in self.left_home.items():
-                self.joint_positions[joint] = float(value)
-            self.joint_positions[self.left_gripper_joint] = self.left_gripper_home_position
+            target_positions = {joint: float(value) for joint, value in self.left_home.items()}
+            target_gripper = self.left_gripper_home_position
+        else:
+            return
+
+        if instant or self.home_transition_duration_sec <= 0.0:
+            for joint, value in target_positions.items():
+                self.joint_positions[joint] = value
+            self.joint_positions[self.get_gripper_joint_name(arm_name)] = target_gripper
+            self.home_transition[arm_name] = None
+            return
+
+        tracked_joints = list(target_positions.keys()) + [self.get_gripper_joint_name(arm_name)]
+        start_positions = {joint: float(self.joint_positions[joint]) for joint in tracked_joints}
+        target_positions[self.get_gripper_joint_name(arm_name)] = float(target_gripper)
+        self.home_transition[arm_name] = {
+            "start_time": rospy.Time.now(),
+            "duration_sec": self.home_transition_duration_sec,
+            "start_positions": start_positions,
+            "target_positions": target_positions,
+        }
+
+    def get_gripper_joint_name(self, arm_name):
+        if arm_name == "right":
+            return self.right_gripper_joint
+        return self.left_gripper_joint
+
+    def clear_arm_command(self, arm_name):
+        if arm_name == "right":
+            self.right_cmd = [0.0 for _ in self.right_joint_names]
+            self.right_gripper_cmd = 0.0
+        elif arm_name == "left":
+            self.left_cmd = [0.0 for _ in self.left_joint_names]
+            self.left_gripper_cmd = 0.0
+
+    def update_home_transition(self, arm_name, now):
+        transition = self.home_transition.get(arm_name)
+        if transition is None:
+            return False
+
+        elapsed = max(0.0, (now - transition["start_time"]).to_sec())
+        duration = max(transition["duration_sec"], 1e-6)
+        alpha = min(1.0, elapsed / duration)
+
+        for joint, target in transition["target_positions"].items():
+            start = transition["start_positions"][joint]
+            self.joint_positions[joint] = start + alpha * (target - start)
+
+        if alpha >= 1.0:
+            self.home_transition[arm_name] = None
+
+        return True
 
     def ensure_joint_in_other_names(self, joint_name):
         if joint_name and joint_name not in self.other_joint_names:
@@ -247,12 +302,15 @@ class FakeKinovaCommandBridge:
     def home_request_cb(self, msg):
         arm = msg.data.strip().lower()
         if arm == "both":
+            self.clear_arm_command("right")
+            self.clear_arm_command("left")
             self.apply_home("right")
             self.apply_home("left")
             rospy.loginfo("Home pose applied to both arms")
             return
         if arm not in ("right", "left"):
             return
+        self.clear_arm_command(arm)
         self.apply_home(arm)
         rospy.loginfo("Home pose applied to %s arm", arm)
 
@@ -299,16 +357,18 @@ class FakeKinovaCommandBridge:
         return max(min(value, self.gripper_max_position), self.gripper_min_position)
 
     def integrate(self, dt):
-        for i, joint in enumerate(self.right_joint_names):
-            self.joint_positions[joint] = self.clamp_angle(self.joint_positions[joint] + self.right_cmd[i] * dt)
-        for i, joint in enumerate(self.left_joint_names):
-            self.joint_positions[joint] = self.clamp_angle(self.joint_positions[joint] + self.left_cmd[i] * dt)
-        self.joint_positions[self.right_gripper_joint] = self.clamp_gripper(
-            self.joint_positions[self.right_gripper_joint] + self.right_gripper_cmd * dt
-        )
-        self.joint_positions[self.left_gripper_joint] = self.clamp_gripper(
-            self.joint_positions[self.left_gripper_joint] + self.left_gripper_cmd * dt
-        )
+        if self.home_transition["right"] is None:
+            for i, joint in enumerate(self.right_joint_names):
+                self.joint_positions[joint] = self.clamp_angle(self.joint_positions[joint] + self.right_cmd[i] * dt)
+            self.joint_positions[self.right_gripper_joint] = self.clamp_gripper(
+                self.joint_positions[self.right_gripper_joint] + self.right_gripper_cmd * dt
+            )
+        if self.home_transition["left"] is None:
+            for i, joint in enumerate(self.left_joint_names):
+                self.joint_positions[joint] = self.clamp_angle(self.joint_positions[joint] + self.left_cmd[i] * dt)
+            self.joint_positions[self.left_gripper_joint] = self.clamp_gripper(
+                self.joint_positions[self.left_gripper_joint] + self.left_gripper_cmd * dt
+            )
 
     def publish_joint_state(self):
         msg = JointState()
@@ -366,6 +426,8 @@ class FakeKinovaCommandBridge:
 
         try:
             self.integrate(dt)
+            self.update_home_transition("right", now)
+            self.update_home_transition("left", now)
             self.publish_joint_state()
             self.publish_dummy_joint_velocities()
         except rospy.ROSException:

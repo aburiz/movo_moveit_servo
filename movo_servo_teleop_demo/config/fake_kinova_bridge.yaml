@@ -22,6 +22,7 @@ gripper_min_position: 0.0
 gripper_max_position: 0.986111027
 right_gripper_home_position: 0.0
 left_gripper_home_position: 0.0
+home_transition_duration_sec: 0.75
 
 # Optional native Kinova home angles (degrees) from real robot.
 # If provided, fake_kinova_command_bridge converts these to MOVO ROS joint coordinates
