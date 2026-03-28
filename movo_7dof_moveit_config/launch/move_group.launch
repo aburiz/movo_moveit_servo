@@ -21,6 +21,7 @@
   <arg name="max_safe_path_cost" default="1"/>
   <arg name="jiggle_fraction" default="0.05" />
   <arg name="publish_monitored_planning_scene" default="true"/>
+  <arg name="moveit_octomap_sensor_params_file" default="$(find movo_7dof_moveit_config)/config/sensors.yaml" />
 
   <!-- Planning Functionality -->
   <include ns="move_group" file="$(find movo_7dof_moveit_config)/launch/planning_pipeline.launch.xml">
@@ -38,6 +39,7 @@
   <rosparam command="delete" param="move_group/sensors" />
   <include ns="move_group" file="$(find movo_7dof_moveit_config)/launch/sensor_manager.launch.xml" if="$(arg allow_trajectory_execution)">
     <arg name="moveit_sensor_manager" value="movo" />
+    <arg name="moveit_octomap_sensor_params_file" value="$(arg moveit_octomap_sensor_params_file)" />
   </include>
 
   <!-- Start the actual move_group node/action server -->

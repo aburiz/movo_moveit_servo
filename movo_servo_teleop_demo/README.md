@@ -91,10 +91,85 @@ export ROS_PACKAGE_PATH=/home/abu/Downloads/movo/movo_moveit_servo:/home/abu/Dow
 export CMAKE_PREFIX_PATH=/home/abu/Downloads/movo_arm_ws-main/devel:$CMAKE_PREFIX_PATH
 ```
 
+### Most Common Run Commands
+
+If this computer is the ROS1 master and its Ethernet IP is `192.168.131.101`, use:
+
+```bash
+source /opt/ros/noetic/setup.bash
+source /home/abu/Downloads/movo_arm_ws-main/devel/setup.bash
+export ROS_MASTER_URI=http://192.168.131.101:11311
+export ROS_IP=192.168.131.101
+export ROS_PACKAGE_PATH=/home/abu/Downloads/movo/movo_moveit_servo:/home/abu/Downloads/movo_arm_ws-main/src:$ROS_PACKAGE_PATH
+export CMAKE_PREFIX_PATH=/home/abu/Downloads/movo_arm_ws-main/devel:$CMAKE_PREFIX_PATH
+```
+
+All-in-one local bringup on this PC:
+
+- RViz
+- MoveIt Servo collision checking
+- Xbox controller
+- Intel RealSense D455 depth perception
+- real Kinova arms over Ethernet
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  use_real_arms:=true \
+  launch_realsense_d455:=true \
+  launch_joy:=true \
+  joy_dev:=/dev/input/js0 \
+  load_test_obstacle:=false \
+  local_machine_ip:=192.168.131.101
+```
+
+Same setup but RViz/sim only, no real arms:
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  use_real_arms:=false \
+  launch_realsense_d455:=true \
+  launch_joy:=true \
+  joy_dev:=/dev/input/js0 \
+  load_test_obstacle:=false
+```
+
+Quick D455 health check while the launch is running:
+
+```bash
+rostopic hz /d455/depth/color/points
+rosrun movo_servo_teleop_demo check_d455_moveit_perception.py
+```
+
 RViz only:
 
 ```bash
 roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch
+```
+
+RViz with an Intel RealSense D455 feeding the MoveIt planning scene in Phase 1:
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  launch_realsense_d455:=true
+```
+
+What the Phase 1 D455 path does:
+
+- starts Intel's ROS1 `realsense2_camera` wrapper
+- enables depth, color, aligned depth, and point cloud output
+- attaches the D455 frame tree to the existing `kinect2_link` mount with a static transform
+- feeds MoveIt Octomap directly from:
+  - `/d455/depth/color/points`
+- also relays the D455 point cloud onto the legacy MOVO topics for compatibility:
+  - `/kinect/sd/points`
+  - `/kinect2/sd/points`
+
+This avoids a broad URDF/SRDF rewrite while still letting MoveIt Servo plan around live depth data from the D455.
+
+If the camera package is not installed yet:
+
+```bash
+sudo apt-get install -y ros-noetic-realsense2-camera ros-noetic-realsense2-description
 ```
 
 RViz only with a different joystick device:
@@ -123,6 +198,60 @@ RViz + real arms together:
 roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
   use_real_arms:=true \
   local_machine_ip:=192.168.131.101
+```
+
+RViz + real arms + D455 + Xbox controller together:
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  use_real_arms:=true \
+  launch_realsense_d455:=true \
+  launch_joy:=true \
+  joy_dev:=/dev/input/js0 \
+  load_test_obstacle:=false \
+  local_machine_ip:=192.168.131.101
+```
+
+`.101` replaces `.10` while `.100` stays the base/bridge machine:
+
+```bash
+source /opt/ros/noetic/setup.bash
+source /home/abu/Downloads/movo_arm_ws-main/devel/setup.bash
+export ROS_MASTER_URI=http://192.168.131.101:11311
+export ROS_IP=192.168.131.101
+export ROS_PACKAGE_PATH=/home/abu/Downloads/movo/movo_moveit_servo:/home/abu/Downloads/movo_arm_ws-main/src:$ROS_PACKAGE_PATH
+export CMAKE_PREFIX_PATH=/home/abu/Downloads/movo_arm_ws-main/devel:$CMAKE_PREFIX_PATH
+
+roslaunch movo_servo_teleop_demo movo_servo_rosbridge_ready.launch
+```
+
+What that wrapper does:
+
+- runs the ROS1 master, Kinova drivers, MoveIt, RViz, fake bridge, and real bridge on `.101`
+- defaults `launch_joy:=false`
+- defaults `use_real_arms:=true`
+- defaults `load_test_obstacle:=false` so bringup is not born in the demo collision box
+- uses `ROS_IP` as the default `local_machine_ip`
+
+On `.100`, keep the bridge there but point it at `.101` instead of `.10`:
+
+```bash
+docker run --rm -it --name ros_bridge \
+  --network host \
+  --ipc host \
+  -v /etc/cyclonedds/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml \
+  -e ROS_MASTER_URI=http://192.168.131.101:11311/ \
+  -e ROS_IP=192.168.131.100 \
+  -e ROS_DOMAIN_ID=0 \
+  -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  -e CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml \
+  kinova_arms_bridge:latest \
+  bash -c "
+    source /opt/ros/humble/setup.bash && \
+    source /kinova_msgs_custom/kinova_msgs_ros2/install/setup.bash && \
+    source /ros-humble-ros1-bridge/install/local_setup.bash && \
+    ros2 run ros1_bridge dynamic_bridge --bridge-all-topics
+  "
 ```
 
 RViz + real arms with explicit port / serial overrides:

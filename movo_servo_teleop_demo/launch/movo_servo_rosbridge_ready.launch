@@ -1,0 +1,38 @@
+<launch>
+  <arg name="local_machine_ip" default="$(optenv ROS_IP '')" />
+  <arg name="rviz" default="true" />
+  <arg name="launch_joy" default="false" />
+  <arg name="joy_dev" default="/dev/input/js0" />
+  <arg name="launch_realsense_d455" default="false" />
+  <arg name="realsense_namespace" default="d455" />
+  <arg name="default_active_arm" default="right" />
+  <arg name="enable_left_servo" default="true" />
+  <arg name="servo_start_delay" default="18.0" />
+  <arg name="real_arms_use_urdf" default="false" />
+  <arg name="real_arms_feedback_publish_rate" default="0.1" />
+  <arg name="respawn_real_arm_driver" default="true" />
+  <arg name="load_test_obstacle" default="false" />
+
+  <!--
+    Convenience wrapper for the "101 replaces 10" setup:
+    - this machine runs the ROS1 master, MoveIt, RViz, Servo, and Kinova drivers
+    - the ROS2 base computer keeps running the ros1_bridge and points ROS_MASTER_URI here
+    local_machine_ip defaults from ROS_IP so the usual shell exports are enough.
+  -->
+  <include file="$(find movo_servo_teleop_demo)/launch/movo_servo_teleop_demo.launch">
+    <arg name="rviz" value="$(arg rviz)" />
+    <arg name="launch_joy" value="$(arg launch_joy)" />
+    <arg name="joy_dev" value="$(arg joy_dev)" />
+    <arg name="launch_realsense_d455" value="$(arg launch_realsense_d455)" />
+    <arg name="realsense_namespace" value="$(arg realsense_namespace)" />
+    <arg name="default_active_arm" value="$(arg default_active_arm)" />
+    <arg name="enable_left_servo" value="$(arg enable_left_servo)" />
+    <arg name="servo_start_delay" value="$(arg servo_start_delay)" />
+    <arg name="load_test_obstacle" value="$(arg load_test_obstacle)" />
+    <arg name="use_real_arms" value="true" />
+    <arg name="local_machine_ip" value="$(arg local_machine_ip)" />
+    <arg name="real_arms_use_urdf" value="$(arg real_arms_use_urdf)" />
+    <arg name="real_arms_feedback_publish_rate" value="$(arg real_arms_feedback_publish_rate)" />
+    <arg name="respawn_real_arm_driver" value="$(arg respawn_real_arm_driver)" />
+  </include>
+</launch>

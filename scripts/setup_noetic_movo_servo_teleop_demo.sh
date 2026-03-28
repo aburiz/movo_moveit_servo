@@ -34,7 +34,9 @@ sudo apt-get update
 sudo apt-get install -y \
   ros-noetic-moveit \
   ros-noetic-moveit-servo \
-  ros-noetic-joy
+  ros-noetic-joy \
+  ros-noetic-realsense2-camera \
+  ros-noetic-realsense2-description
 
 if [[ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]]; then
   sudo rosdep init

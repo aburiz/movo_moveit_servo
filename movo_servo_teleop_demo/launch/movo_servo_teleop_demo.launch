@@ -2,9 +2,12 @@
   <arg name="rviz" default="true" />
   <arg name="launch_joy" default="true" />
   <arg name="joy_dev" default="/dev/input/js0" />
+  <arg name="launch_realsense_d455" default="false" />
+  <arg name="realsense_namespace" default="d455" />
   <arg name="default_active_arm" default="right" />
   <arg name="enable_left_servo" default="true" />
   <arg name="servo_start_delay" default="18.0" />
+  <arg name="load_test_obstacle" default="true" />
   <arg name="use_real_arms" default="false" />
   <arg name="local_machine_ip" default="" />
   <arg name="subnet_mask" default="255.255.255.0" />
@@ -48,12 +51,29 @@
 
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen" />
 
+  <!-- Optional Phase 1 D455 perception path: keep the existing Kinect mount in
+       the robot model, attach the D455 frame tree to it, and relay the D455
+       point cloud onto the legacy MOVO topics used by MoveIt and RViz. -->
+  <include if="$(arg launch_realsense_d455)"
+           file="$(find movo_servo_teleop_demo)/launch/d455_moveit_perception.launch">
+    <arg name="camera_namespace" value="$(arg realsense_namespace)" />
+  </include>
+
   <!-- MoveIt core for planning scene + collision model -->
-  <include file="$(find movo_7dof_moveit_config)/launch/move_group.launch">
+  <include unless="$(arg launch_realsense_d455)" file="$(find movo_7dof_moveit_config)/launch/move_group.launch">
     <arg name="load_robot_description" value="false" />
     <arg name="allow_trajectory_execution" value="true" />
     <arg name="fake_execution" value="true" />
     <arg name="info" value="true" />
+  </include>
+
+  <include if="$(arg launch_realsense_d455)" file="$(find movo_7dof_moveit_config)/launch/move_group.launch">
+    <arg name="load_robot_description" value="false" />
+    <arg name="allow_trajectory_execution" value="true" />
+    <arg name="fake_execution" value="true" />
+    <arg name="info" value="true" />
+    <arg name="moveit_octomap_sensor_params_file"
+         value="$(find movo_servo_teleop_demo)/config/d455_moveit_sensors.yaml" />
   </include>
 
   <include if="$(arg rviz)" file="$(find movo_7dof_moveit_config)/launch/moveit_rviz.launch">
@@ -67,7 +87,7 @@
   </node>
 
   <!-- Add a static test obstacle to the MoveIt planning scene -->
-  <node pkg="movo_servo_teleop_demo" type="add_test_obstacles.py"
+  <node if="$(arg load_test_obstacle)" pkg="movo_servo_teleop_demo" type="add_test_obstacles.py"
         name="add_test_obstacles" output="screen">
     <rosparam command="load" file="$(find movo_servo_teleop_demo)/config/obstacles.yaml" />
   </node>
