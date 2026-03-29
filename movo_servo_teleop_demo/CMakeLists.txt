@@ -20,6 +20,7 @@ catkin_install_python(PROGRAMS
   scripts/ping_real_arm.py
   scripts/check_d455_moveit_perception.py
   scripts/octomap_live_refresh.py
+  scripts/rosbridge_compat_adapter.py
   scripts/real_arm_launch_error.py
   scripts/add_test_obstacles.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

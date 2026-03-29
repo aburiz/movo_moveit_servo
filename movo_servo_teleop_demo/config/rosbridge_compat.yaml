@@ -1,0 +1,25 @@
+# ROS1 compatibility layer for the existing Humble <-> Noetic bridge.
+#
+# This adapter keeps the public ROS1-side command surface compatible with the
+# old non-MoveIt-Servo setup while routing Cartesian arm motion through MoveIt
+# Servo for collision-aware control.
+
+config_namespace: /movo_servo_teleop_demo/real_arms
+command_frame: base_link
+publish_driver_enabled_on_start: true
+publish_estop_clear_on_start: true
+home_wait_timeout_sec: 45.0
+home_position_tolerance_deg: 6.0
+legacy_gripper_velocity_scale: 5000.0
+
+right:
+  public_driver_namespace: /right_arm/right_arm_driver
+  internal_driver_namespace: /right_arm/right_arm_driver/internal
+  servo_twist_topic: /movo_servo_teleop_demo/right/delta_twist_cmds
+  servo_gripper_velocity_topic: /movo_servo_teleop_demo/right/gripper_velocity_cmd
+
+left:
+  public_driver_namespace: /left_arm/left_arm_driver
+  internal_driver_namespace: /left_arm/left_arm_driver/internal
+  servo_twist_topic: /movo_servo_teleop_demo/left/delta_twist_cmds
+  servo_gripper_velocity_topic: /movo_servo_teleop_demo/left/gripper_velocity_cmd

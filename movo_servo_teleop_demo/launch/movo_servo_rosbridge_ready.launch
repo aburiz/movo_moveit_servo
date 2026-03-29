@@ -12,6 +12,7 @@
   <arg name="real_arms_feedback_publish_rate" default="0.1" />
   <arg name="respawn_real_arm_driver" default="true" />
   <arg name="load_test_obstacle" default="false" />
+  <arg name="use_rosbridge_compat" default="true" />
 
   <!--
     Convenience wrapper for the "101 replaces 10" setup:
@@ -29,6 +30,7 @@
     <arg name="enable_left_servo" value="$(arg enable_left_servo)" />
     <arg name="servo_start_delay" value="$(arg servo_start_delay)" />
     <arg name="load_test_obstacle" value="$(arg load_test_obstacle)" />
+    <arg name="use_rosbridge_compat" value="$(arg use_rosbridge_compat)" />
     <arg name="use_real_arms" value="true" />
     <arg name="local_machine_ip" value="$(arg local_machine_ip)" />
     <arg name="real_arms_use_urdf" value="$(arg real_arms_use_urdf)" />

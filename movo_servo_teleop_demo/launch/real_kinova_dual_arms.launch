@@ -5,6 +5,7 @@
   <arg name="use_urdf" default="false" />
   <arg name="feedback_publish_rate" default="0.1" />
   <arg name="respawn_driver" default="true" />
+  <arg name="rosbridge_compat_mode" default="false" />
   <arg name="kinova_sdk_lib_dir" default="$(find movo_servo_teleop_demo)/../kinova_api/runtime/usr/lib" />
 
   <arg name="right_robot_name" default="right_arm" />
@@ -68,7 +69,8 @@
       </node>
     </group>
 
-    <node name="$(arg right_robot_name)_driver" pkg="kinova_driver" type="kinova_arm_driver"
+    <node unless="$(arg rosbridge_compat_mode)"
+          name="$(arg right_robot_name)_driver" pkg="kinova_driver" type="kinova_arm_driver"
           output="screen" cwd="node" args="$(arg kinova_robot_type)" respawn="$(arg respawn_driver)">
       <env name="LD_LIBRARY_PATH" value="$(arg kinova_sdk_lib_dir):$(optenv LD_LIBRARY_PATH)" />
       <rosparam subst_value="true">
@@ -86,6 +88,32 @@ ethernet:
       <param name="robot_type" value="$(arg kinova_robot_type)" />
       <param name="status_interval_seconds" value="$(arg feedback_publish_rate)" />
     </node>
+
+    <node if="$(arg rosbridge_compat_mode)"
+          name="$(arg right_robot_name)_driver" pkg="kinova_driver" type="kinova_arm_driver"
+          output="screen" cwd="node" args="$(arg kinova_robot_type)" respawn="$(arg respawn_driver)">
+      <env name="LD_LIBRARY_PATH" value="$(arg kinova_sdk_lib_dir):$(optenv LD_LIBRARY_PATH)" />
+      <rosparam subst_value="true">
+connection_type: Ethernet
+ethernet:
+  local_machine_IP: $(arg local_machine_ip)
+  subnet_mask: $(arg subnet_mask)
+  local_cmd_port: $(arg right_local_cmd_port)
+  local_broadcast_port: $(arg right_local_broadcast_port)
+  robot_IP: $(arg right_arm_ip)
+  robotPort: $(arg right_robot_port)
+      </rosparam>
+      <param name="serial_number" value="$(arg right_arm_serial)" />
+      <param name="robot_name" value="$(arg right_robot_name)" />
+      <param name="robot_type" value="$(arg kinova_robot_type)" />
+      <param name="status_interval_seconds" value="$(arg feedback_publish_rate)" />
+      <remap from="in/cartesian_velocity" to="internal/in/cartesian_velocity" />
+      <remap from="in/cartesian_velocity_with_fingers" to="internal/in/cartesian_velocity_with_fingers" />
+      <remap from="in/cartesian_velocity_with_finger_velocity" to="internal/in/cartesian_velocity_with_finger_velocity" />
+      <remap from="in/start" to="internal/in/start" />
+      <remap from="in/stop" to="internal/in/stop" />
+      <remap from="in/home_arm" to="internal/in/home_arm" />
+    </node>
   </group>
 
   <group if="$(eval arg('local_machine_ip') != '')" ns="$(arg left_robot_name)">
@@ -97,7 +125,8 @@ ethernet:
       </node>
     </group>
 
-    <node name="$(arg left_robot_name)_driver" pkg="kinova_driver" type="kinova_arm_driver"
+    <node unless="$(arg rosbridge_compat_mode)"
+          name="$(arg left_robot_name)_driver" pkg="kinova_driver" type="kinova_arm_driver"
           output="screen" cwd="node" args="$(arg kinova_robot_type)" respawn="$(arg respawn_driver)">
       <env name="LD_LIBRARY_PATH" value="$(arg kinova_sdk_lib_dir):$(optenv LD_LIBRARY_PATH)" />
       <rosparam subst_value="true">
@@ -114,6 +143,32 @@ ethernet:
       <param name="robot_name" value="$(arg left_robot_name)" />
       <param name="robot_type" value="$(arg kinova_robot_type)" />
       <param name="status_interval_seconds" value="$(arg feedback_publish_rate)" />
+    </node>
+
+    <node if="$(arg rosbridge_compat_mode)"
+          name="$(arg left_robot_name)_driver" pkg="kinova_driver" type="kinova_arm_driver"
+          output="screen" cwd="node" args="$(arg kinova_robot_type)" respawn="$(arg respawn_driver)">
+      <env name="LD_LIBRARY_PATH" value="$(arg kinova_sdk_lib_dir):$(optenv LD_LIBRARY_PATH)" />
+      <rosparam subst_value="true">
+connection_type: Ethernet
+ethernet:
+  local_machine_IP: $(arg local_machine_ip)
+  subnet_mask: $(arg subnet_mask)
+  local_cmd_port: $(arg left_local_cmd_port)
+  local_broadcast_port: $(arg left_local_broadcast_port)
+  robot_IP: $(arg left_arm_ip)
+  robotPort: $(arg left_robot_port)
+      </rosparam>
+      <param name="serial_number" value="$(arg left_arm_serial)" />
+      <param name="robot_name" value="$(arg left_robot_name)" />
+      <param name="robot_type" value="$(arg kinova_robot_type)" />
+      <param name="status_interval_seconds" value="$(arg feedback_publish_rate)" />
+      <remap from="in/cartesian_velocity" to="internal/in/cartesian_velocity" />
+      <remap from="in/cartesian_velocity_with_fingers" to="internal/in/cartesian_velocity_with_fingers" />
+      <remap from="in/cartesian_velocity_with_finger_velocity" to="internal/in/cartesian_velocity_with_finger_velocity" />
+      <remap from="in/start" to="internal/in/start" />
+      <remap from="in/stop" to="internal/in/stop" />
+      <remap from="in/home_arm" to="internal/in/home_arm" />
     </node>
   </group>
 </launch>

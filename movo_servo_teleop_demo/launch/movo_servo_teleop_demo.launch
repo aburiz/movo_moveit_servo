@@ -14,6 +14,7 @@
   <arg name="servo_start_delay" default="18.0" />
   <arg name="load_test_obstacle" default="true" />
   <arg name="use_real_arms" default="false" />
+  <arg name="use_rosbridge_compat" default="false" />
   <arg name="local_machine_ip" default="" />
   <arg name="subnet_mask" default="255.255.255.0" />
   <arg name="real_arms_use_urdf" default="false" />
@@ -131,6 +132,12 @@
     <param name="default_active_arm" value="$(arg default_active_arm)" />
   </node>
 
+  <node if="$(arg use_rosbridge_compat)" pkg="movo_servo_teleop_demo" type="rosbridge_compat_adapter.py"
+        name="rosbridge_compat_adapter" output="screen">
+    <rosparam command="load" file="$(find movo_servo_teleop_demo)/config/rosbridge_compat.yaml" />
+    <param name="config_namespace" value="/movo_servo_teleop_demo/real_arms" />
+  </node>
+
   <node if="$(eval arg('use_real_arms') and (not arg('local_machine_ip')))"
         pkg="movo_servo_teleop_demo" type="real_arm_launch_error.py" name="real_arm_launch_error"
         output="screen" required="true">
@@ -155,6 +162,7 @@
     <arg name="right_local_broadcast_port" value="$(arg right_local_broadcast_port)" />
     <arg name="left_arm_serial" value="$(arg left_arm_serial)" />
     <arg name="right_arm_serial" value="$(arg right_arm_serial)" />
+    <arg name="rosbridge_compat_mode" value="$(arg use_rosbridge_compat)" />
   </include>
 
   <node if="$(eval arg('use_real_arms') and (arg('local_machine_ip') != ''))"

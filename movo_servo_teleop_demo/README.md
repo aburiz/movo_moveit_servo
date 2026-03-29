@@ -7,6 +7,47 @@ ROS 1 Noetic MoveIt Servo teleop for MOVO with two operating modes:
 
 This integration is built for the classic Kinova ROS stack used in the reference `movo_arm_ws`, not Kortex / Gen3.
 
+## ROS Bridge Compatibility
+
+The copied Humble bridge folder in
+`/home/abu/Downloads/ros-humble-ros1-bridge-builder(DO NOT MODIFY ONLY REFER)`
+was used as a read-only reference only.
+
+What it is doing:
+
+- runs `ros2 run ros1_bridge dynamic_bridge --bridge-all-topics`
+- points the ROS2 bridge container at the ROS1 master with `ROS_MASTER_URI`
+- includes custom `kinova_msgs` support for:
+  - `PoseVelocity`
+  - `JointVelocity`
+  - `HomeArm`
+  - `Start`
+  - `Stop`
+  - `ClearTrajectories`
+  - `ArmJointAngles`
+  - `SetFingersPosition`
+
+What this repo now does for that bridge:
+
+- keeps the old public ROS1-side Cartesian Kinova command topics alive:
+  - `/right_arm/right_arm_driver/in/cartesian_velocity`
+  - `/left_arm/left_arm_driver/in/cartesian_velocity`
+- keeps the old public ROS1-side Kinova services alive:
+  - `/right_arm/right_arm_driver/in/start`
+  - `/right_arm/right_arm_driver/in/stop`
+  - `/right_arm/right_arm_driver/in/home_arm`
+  - `/left_arm/left_arm_driver/in/start`
+  - `/left_arm/left_arm_driver/in/stop`
+  - `/left_arm/left_arm_driver/in/home_arm`
+- routes those Cartesian velocity commands into MoveIt Servo instead of letting them go straight to the hardware driver
+- keeps the public `fingers_action/finger_positions` action on the classic Kinova names, so bridged gripper actions still target the driver directly
+
+Important limitation:
+
+- direct legacy `/<arm>/<driver>/in/joint_velocity` still remains a raw driver path
+- that topic is not collision-filtered by MoveIt Servo
+- the collision-aware replacement path is the Cartesian command interface above
+
 ## Architecture
 
 - `xbox_servo_mapper.py`
@@ -17,6 +58,8 @@ This integration is built for the classic Kinova ROS stack used in the reference
   Brings up the classic Kinova Ethernet drivers under:
   - `/right_arm/right_arm_driver`
   - `/left_arm/left_arm_driver`
+- `rosbridge_compat_adapter.py`
+  Preserves the old ROS1-side Kinova/MOVO command interface expected by the Humble bridge and maps Cartesian commands into the Servo topics.
 - `real_kinova_command_bridge.py`
   Subscribes to the existing Servo outputs:
   - `/movo_servo_teleop_demo/right/joint_velocity_cmd`
@@ -259,8 +302,26 @@ What that wrapper does:
 - runs the ROS1 master, Kinova drivers, MoveIt, RViz, fake bridge, and real bridge on `.101`
 - defaults `launch_joy:=false`
 - defaults `use_real_arms:=true`
+- defaults `use_rosbridge_compat:=true`
 - defaults `load_test_obstacle:=false` so bringup is not born in the demo collision box
 - uses `ROS_IP` as the default `local_machine_ip`
+- preserves the public ROS1 Kinova cartesian/start/stop/home interface for the bridge while routing cartesian arm motion through MoveIt Servo
+
+Most likely replacement-PC command when you want the base bridge on `.100` to keep talking to the same ROS1-side arm interface:
+
+```bash
+source /opt/ros/noetic/setup.bash
+source /home/abu/Downloads/movo_arm_ws-main/devel/setup.bash
+export ROS_MASTER_URI=http://192.168.131.101:11311
+export ROS_IP=192.168.131.101
+export ROS_PACKAGE_PATH=/home/abu/Downloads/movo/movo_moveit_servo:/home/abu/Downloads/movo_arm_ws-main/src:$ROS_PACKAGE_PATH
+export CMAKE_PREFIX_PATH=/home/abu/Downloads/movo_arm_ws-main/devel:$CMAKE_PREFIX_PATH
+
+roslaunch movo_servo_teleop_demo movo_servo_rosbridge_ready.launch \
+  local_machine_ip:=192.168.131.101 \
+  launch_realsense_d455:=true \
+  rviz:=true
+```
 
 On `.100`, keep the bridge there but point it at `.101` instead of `.10`:
 
@@ -281,6 +342,18 @@ docker run --rm -it --name ros_bridge \
     source /ros-humble-ros1-bridge/install/local_setup.bash && \
     ros2 run ros1_bridge dynamic_bridge --bridge-all-topics
   "
+```
+
+If you want the same rosbridge-compatible mode without the convenience wrapper, the equivalent base launch is:
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  use_real_arms:=true \
+  use_rosbridge_compat:=true \
+  launch_joy:=false \
+  load_test_obstacle:=false \
+  launch_realsense_d455:=true \
+  local_machine_ip:=192.168.131.101
 ```
 
 RViz + real arms with explicit port / serial overrides:
