@@ -29,24 +29,46 @@ What it is doing:
 
 What this repo now does for that bridge:
 
-- keeps the old public ROS1-side Cartesian Kinova command topics alive:
+- keeps the bridge-facing ROS1 master lean by splitting the system into:
+  - public/shared master on `.101:11311`
+  - private/local compute master on `127.0.0.1:11312`
+- keeps the old public ROS1-side Cartesian Kinova command topics alive on the public/shared master:
   - `/right_arm/right_arm_driver/in/cartesian_velocity`
   - `/left_arm/left_arm_driver/in/cartesian_velocity`
-- keeps the old public ROS1-side Kinova services alive:
+- keeps the old public ROS1-side Kinova services alive on the public/shared master:
   - `/right_arm/right_arm_driver/in/start`
   - `/right_arm/right_arm_driver/in/stop`
   - `/right_arm/right_arm_driver/in/home_arm`
+  - `/right_arm/right_arm_driver/in/clear_trajectories`
   - `/left_arm/left_arm_driver/in/start`
   - `/left_arm/left_arm_driver/in/stop`
   - `/left_arm/left_arm_driver/in/home_arm`
-- routes those Cartesian velocity commands into MoveIt Servo instead of letting them go straight to the hardware driver
-- keeps the public `fingers_action/finger_positions` action on the classic Kinova names, so bridged gripper actions still target the driver directly
+  - `/left_arm/left_arm_driver/in/clear_trajectories`
+- keeps the classic Kinova actions alive on the public/shared master:
+  - `/right_arm/right_arm_driver/fingers_action/finger_positions`
+  - `/right_arm/right_arm_driver/joints_action/joint_angles`
+  - `/right_arm/right_arm_driver/pose_action/tool_pose`
+  - `/left_arm/left_arm_driver/fingers_action/finger_positions`
+  - `/left_arm/left_arm_driver/joints_action/joint_angles`
+  - `/left_arm/left_arm_driver/pose_action/tool_pose`
+- mirrors only lightweight feedback back onto the public/shared master:
+  - `/right_arm/right_arm_driver/out/joint_state`
+  - `/right_arm/right_arm_driver/out/joint_angles`
+  - `/right_arm/right_arm_driver/out/finger_position`
+  - `/right_arm/right_arm_driver/out/tool_pose`
+  - `/left_arm/left_arm_driver/out/joint_state`
+  - `/left_arm/left_arm_driver/out/joint_angles`
+  - `/left_arm/left_arm_driver/out/finger_position`
+  - `/left_arm/left_arm_driver/out/tool_pose`
+- routes public Cartesian velocity commands into MoveIt Servo on the private/local master instead of letting them go straight to the hardware driver
+- keeps D455, MoveIt, Servo, octomap, RViz, fake bridge, and the real Kinova drivers on the private/local master only
+- keeps camera/depth/octomap topics off the bridge-facing master entirely, so `dynamic_bridge --bridge-all-topics` does not forward them
 
 Important limitation:
 
-- direct legacy `/<arm>/<driver>/in/joint_velocity` still remains a raw driver path
-- that topic is not collision-filtered by MoveIt Servo
-- the collision-aware replacement path is the Cartesian command interface above
+- direct legacy `/<arm>/<driver>/in/joint_velocity` is intentionally not exposed on the public/shared master in split-master mode
+- that avoids bypassing MoveIt Servo through the bridge
+- the collision-aware public replacement path is the Cartesian command interface above
 
 ## Architecture
 
@@ -58,8 +80,21 @@ Important limitation:
   Brings up the classic Kinova Ethernet drivers under:
   - `/right_arm/right_arm_driver`
   - `/left_arm/left_arm_driver`
-- `rosbridge_compat_adapter.py`
-  Preserves the old ROS1-side Kinova/MOVO command interface expected by the Humble bridge and maps Cartesian commands into the Servo topics.
+- `private_compute_stack.py`
+  Starts a hidden local ROS1 master on `127.0.0.1:11312` and launches the private compute stack there.
+- `movo_servo_private_compute.launch`
+  Brings up the private/local compute master stack:
+  - D455
+  - MoveIt
+  - MoveIt Servo
+  - fake bridge
+  - real Kinova drivers
+  - real command bridge
+  - optional RViz / joystick
+- `rosbridge_private_gateway.py`
+  Lives on the private/local master and accepts lean localhost commands from the public/shared master.
+- `rosbridge_public_gateway.py`
+  Lives on the public/shared master and preserves the classic Kinova command surface expected by the Humble bridge.
 - `real_kinova_command_bridge.py`
   Subscribes to the existing Servo outputs:
   - `/movo_servo_teleop_demo/right/joint_velocity_cmd`
@@ -199,17 +234,16 @@ roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
 What the Phase 1 D455 path does:
 
 - starts Intel's ROS1 `realsense2_camera` wrapper
-- enables depth, color, aligned depth, and point cloud output
+- enables depth, color, and aligned depth output
 - attaches the D455 frame tree to the existing `kinect2_link` mount with a static transform
 - feeds MoveIt Octomap directly from the aligned D455 depth image:
   - `/d455/aligned_depth_to_color/image_raw`
 - keeps the D455 depth stream out to `6.0 m` so removed obstacles still have background data available for clearing
 - limits the MoveIt depth-octomap updater itself to `0.8 m` so only nearby obstacles become occupied voxels
-- raises the Octomap update cap to `15 Hz` for faster clearing of transient obstacles
+- raises the Octomap update cap to `30 Hz` for faster clearing of transient obstacles
 - runs a lightweight octomap live-refresh node so stale occupied cells are periodically dropped and rebuilt from the current depth view
-- also relays the D455 point cloud onto the legacy MOVO topics for compatibility:
-  - `/kinect/sd/points`
-  - `/kinect2/sd/points`
+- keeps the D455 point cloud off by default because MoveIt is using the aligned depth image directly
+- keeps the D455 topics local-only in split-master rosbridge mode so the bridge does not forward camera traffic
 
 This avoids a broad URDF/SRDF rewrite while still letting MoveIt Servo plan around live depth data from the D455. The aligned depth-image updater is also less prone to leaving behind "ghost" occupied voxels after a transient obstacle such as a hand moves away.
 
@@ -299,13 +333,14 @@ roslaunch movo_servo_teleop_demo movo_servo_rosbridge_ready.launch
 
 What that wrapper does:
 
-- runs the ROS1 master, Kinova drivers, MoveIt, RViz, fake bridge, and real bridge on `.101`
+- keeps `.101:11311` as the public/shared ROS1 master for the Humble bridge
+- starts a private/local ROS1 compute master on `127.0.0.1:11312`
+- runs Kinova drivers, D455, MoveIt, Servo, fake bridge, real bridge, and optional RViz on the private/local master
+- runs only the lean public Kinova-compatible gateway on the public/shared master
 - defaults `launch_joy:=false`
-- defaults `use_real_arms:=true`
-- defaults `use_rosbridge_compat:=true`
 - defaults `load_test_obstacle:=false` so bringup is not born in the demo collision box
 - uses `ROS_IP` as the default `local_machine_ip`
-- preserves the public ROS1 Kinova cartesian/start/stop/home interface for the bridge while routing cartesian arm motion through MoveIt Servo
+- keeps D455, depth, point cloud, and octomap topics off the bridge-facing master
 
 Most likely replacement-PC command when you want the base bridge on `.100` to keep talking to the same ROS1-side arm interface:
 
@@ -344,16 +379,33 @@ docker run --rm -it --name ros_bridge \
   "
 ```
 
-If you want the same rosbridge-compatible mode without the convenience wrapper, the equivalent base launch is:
+Lean split-master checks after the wrapper is up:
+
+Public/shared master should stay camera-free:
 
 ```bash
-roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
-  use_real_arms:=true \
-  use_rosbridge_compat:=true \
-  launch_joy:=false \
-  load_test_obstacle:=false \
-  launch_realsense_d455:=true \
-  local_machine_ip:=192.168.131.101
+source /opt/ros/noetic/setup.bash
+source /home/abu/Downloads/movo_arm_ws-main/devel/setup.bash
+export ROS_MASTER_URI=http://192.168.131.101:11311
+export ROS_IP=192.168.131.101
+rostopic list | rg 'd455|aligned_depth|image_raw|points|octomap'
+```
+
+Expected: no D455 / depth / point-cloud topics on the public/shared master.
+
+Private/local compute checks:
+
+```bash
+source /opt/ros/noetic/setup.bash
+source /home/abu/Downloads/movo_arm_ws-main/devel/setup.bash
+export ROS_MASTER_URI=http://127.0.0.1:11312
+unset ROS_IP
+unset ROS_HOSTNAME
+export ROS_PACKAGE_PATH=/home/abu/Downloads/movo/movo_moveit_servo:/home/abu/Downloads/movo_arm_ws-main/src:$ROS_PACKAGE_PATH
+export CMAKE_PREFIX_PATH=/home/abu/Downloads/movo_arm_ws-main/devel:$CMAKE_PREFIX_PATH
+
+rostopic hz /d455/aligned_depth_to_color/image_raw
+rosrun movo_servo_teleop_demo check_d455_moveit_perception.py
 ```
 
 RViz + real arms with explicit port / serial overrides:
@@ -452,19 +504,42 @@ Only actuator 1 is corrected now.
 
 ## Runtime Topics And Services
 
-Real driver command topics:
+Single-master local teleop mode publishes real driver joint velocities here:
 
 - `/right_arm/right_arm_driver/in/joint_velocity`
 - `/left_arm/left_arm_driver/in/joint_velocity`
 
-Real driver services:
+Single-master local teleop mode uses these real driver services:
 
 - `/right_arm/right_arm_driver/in/start`
 - `/right_arm/right_arm_driver/in/stop`
 - `/left_arm/left_arm_driver/in/start`
 - `/left_arm/left_arm_driver/in/stop`
 
-Custom home actions used by the teleop bridge:
+Split-master rosbridge mode exposes these public bridge-facing interfaces instead:
+
+- `/right_arm/right_arm_driver/in/cartesian_velocity`
+- `/right_arm/right_arm_driver/in/cartesian_velocity_with_fingers`
+- `/right_arm/right_arm_driver/in/cartesian_velocity_with_finger_velocity`
+- `/right_arm/right_arm_driver/in/start`
+- `/right_arm/right_arm_driver/in/stop`
+- `/right_arm/right_arm_driver/in/home_arm`
+- `/right_arm/right_arm_driver/in/clear_trajectories`
+- `/right_arm/right_arm_driver/fingers_action/finger_positions`
+- `/right_arm/right_arm_driver/joints_action/joint_angles`
+- `/right_arm/right_arm_driver/pose_action/tool_pose`
+- `/left_arm/left_arm_driver/in/cartesian_velocity`
+- `/left_arm/left_arm_driver/in/cartesian_velocity_with_fingers`
+- `/left_arm/left_arm_driver/in/cartesian_velocity_with_finger_velocity`
+- `/left_arm/left_arm_driver/in/start`
+- `/left_arm/left_arm_driver/in/stop`
+- `/left_arm/left_arm_driver/in/home_arm`
+- `/left_arm/left_arm_driver/in/clear_trajectories`
+- `/left_arm/left_arm_driver/fingers_action/finger_positions`
+- `/left_arm/left_arm_driver/joints_action/joint_angles`
+- `/left_arm/left_arm_driver/pose_action/tool_pose`
+
+Custom home actions used internally by the teleop bridge:
 
 - `/right_arm/right_arm_driver/joints_action/joint_angles`
 - `/left_arm/left_arm_driver/joints_action/joint_angles`

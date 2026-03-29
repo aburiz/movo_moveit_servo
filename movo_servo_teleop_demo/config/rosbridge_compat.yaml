@@ -1,8 +1,18 @@
 # ROS1 compatibility layer for the existing Humble <-> Noetic bridge.
 #
-# This adapter keeps the public ROS1-side command surface compatible with the
-# old non-MoveIt-Servo setup while routing Cartesian arm motion through MoveIt
-# Servo for collision-aware control.
+# Public/shared ROS1 master:
+#   - classic Kinova-facing command surface only
+#   - this is the master the Humble ros1_bridge container points at
+#
+# Private/local ROS1 master:
+#   - D455
+#   - MoveIt
+#   - MoveIt Servo
+#   - fake bridge
+#   - real Kinova drivers
+#
+# The public and private masters talk only through a tiny localhost transport so
+# camera/depth/octomap topics never leak onto the bridge-facing master.
 
 config_namespace: /movo_servo_teleop_demo/real_arms
 command_frame: base_link
@@ -11,15 +21,24 @@ publish_estop_clear_on_start: true
 home_wait_timeout_sec: 45.0
 home_position_tolerance_deg: 6.0
 legacy_gripper_velocity_scale: 5000.0
+public_feedback_rate_hz: 10.0
+
+private_master_uri: http://127.0.0.1:11312
+private_ros_ip: 127.0.0.1
+private_command_host: 127.0.0.1
+private_command_port: 45931
+private_rpc_host: 127.0.0.1
+private_rpc_port: 45932
+private_rpc_timeout_sec: 2.0
 
 right:
   public_driver_namespace: /right_arm/right_arm_driver
-  internal_driver_namespace: /right_arm/right_arm_driver/internal
+  private_driver_namespace: /right_arm/right_arm_driver
   servo_twist_topic: /movo_servo_teleop_demo/right/delta_twist_cmds
   servo_gripper_velocity_topic: /movo_servo_teleop_demo/right/gripper_velocity_cmd
 
 left:
   public_driver_namespace: /left_arm/left_arm_driver
-  internal_driver_namespace: /left_arm/left_arm_driver/internal
+  private_driver_namespace: /left_arm/left_arm_driver
   servo_twist_topic: /movo_servo_teleop_demo/left/delta_twist_cmds
   servo_gripper_velocity_topic: /movo_servo_teleop_demo/left/gripper_velocity_cmd

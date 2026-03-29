@@ -4,7 +4,8 @@
   <arg name="initial_reset" default="true" />
   <arg name="align_depth" default="true" />
   <arg name="enable_sync" default="true" />
-  <arg name="enable_pointcloud" default="true" />
+  <arg name="enable_pointcloud" default="false" />
+  <arg name="filters" default="" />
   <arg name="depth_width" default="640" />
   <arg name="depth_height" default="480" />
   <arg name="depth_fps" default="30" />
@@ -46,7 +47,7 @@
       <arg name="enable_pointcloud" value="$(arg enable_pointcloud)" />
       <arg name="align_depth" value="$(arg align_depth)" />
       <arg name="enable_sync" value="$(arg enable_sync)" />
-      <arg name="filters" value="pointcloud" />
+      <arg name="filters" value="$(arg filters)" />
       <arg name="depth_width" value="$(arg depth_width)" />
       <arg name="depth_height" value="$(arg depth_height)" />
       <arg name="depth_fps" value="$(arg depth_fps)" />
@@ -60,10 +61,6 @@
     </include>
   </group>
 
-  <!-- Preserve the existing MOVO topic names so MoveIt and RViz configs can
-       consume the D455 point cloud without broader rewiring in Phase 1. -->
-  <node pkg="topic_tools" type="relay" name="d455_to_kinect_points" output="screen"
-        args="/$(arg camera_namespace)/depth/color/points /kinect/sd/points" />
-  <node pkg="topic_tools" type="relay" name="d455_to_kinect2_points" output="screen"
-        args="/$(arg camera_namespace)/depth/color/points /kinect2/sd/points" />
+  <!-- MoveIt now consumes the aligned depth image directly, so the D455 stays
+       lean by default: no legacy Kinect point-cloud relays are published. -->
 </launch>

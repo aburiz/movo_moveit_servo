@@ -58,8 +58,8 @@
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen" />
 
   <!-- Optional Phase 1 D455 perception path: keep the existing Kinect mount in
-       the robot model, attach the D455 frame tree to it, and relay the D455
-       point cloud onto the legacy MOVO topics used by MoveIt and RViz. -->
+       the robot model and attach the D455 frame tree to it. MoveIt consumes
+       the aligned depth image directly, so the camera stays lean by default. -->
   <include if="$(arg launch_realsense_d455)"
            file="$(find movo_servo_teleop_demo)/launch/d455_moveit_perception.launch">
     <arg name="camera_namespace" value="$(arg realsense_namespace)" />

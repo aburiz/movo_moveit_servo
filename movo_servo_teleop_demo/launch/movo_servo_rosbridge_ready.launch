@@ -5,6 +5,11 @@
   <arg name="joy_dev" default="/dev/input/js0" />
   <arg name="launch_realsense_d455" default="false" />
   <arg name="realsense_namespace" default="d455" />
+  <arg name="realsense_clip_distance" default="6.0" />
+  <arg name="octomap_max_range" default="0.8" />
+  <arg name="live_octomap_refresh" default="true" />
+  <arg name="live_octomap_refresh_period_sec" default="0.15" />
+  <arg name="live_octomap_refresh_startup_delay_sec" default="8.0" />
   <arg name="default_active_arm" default="right" />
   <arg name="enable_left_servo" default="true" />
   <arg name="servo_start_delay" default="18.0" />
@@ -12,29 +17,74 @@
   <arg name="real_arms_feedback_publish_rate" default="0.1" />
   <arg name="respawn_real_arm_driver" default="true" />
   <arg name="load_test_obstacle" default="false" />
-  <arg name="use_rosbridge_compat" default="true" />
+  <arg name="left_arm_ip" default="192.168.131.20" />
+  <arg name="right_arm_ip" default="192.168.131.30" />
+  <arg name="left_robot_port" default="65535" />
+  <arg name="right_robot_port" default="25000" />
+  <arg name="left_local_cmd_port" default="25010" />
+  <arg name="left_local_broadcast_port" default="25015" />
+  <arg name="right_local_cmd_port" default="25000" />
+  <arg name="right_local_broadcast_port" default="25005" />
+  <arg name="left_arm_serial" default="PJ00900006432489-0" />
+  <arg name="right_arm_serial" default="PJ00900006509075-0" />
+
+  <arg name="private_master_uri" default="http://127.0.0.1:11312" />
+  <arg name="private_ros_ip" default="127.0.0.1" />
+  <arg name="start_private_roscore" default="true" />
+  <arg name="fail_if_private_master_running" default="true" />
+  <arg name="private_master_wait_timeout_sec" default="15.0" />
 
   <!--
-    Convenience wrapper for the "101 replaces 10" setup:
-    - this machine runs the ROS1 master, MoveIt, RViz, Servo, and Kinova drivers
-    - the ROS2 base computer keeps running the ros1_bridge and points ROS_MASTER_URI here
-    local_machine_ip defaults from ROS_IP so the usual shell exports are enough.
+    Split-master rosbridge bringup:
+    - public/shared ROS1 master (.101:11311): lean Kinova-compatible command surface only
+    - private/local ROS1 master (127.0.0.1:11312): D455, MoveIt, Servo, RViz, fake bridge, real drivers
+    The Humble ros1_bridge container should point ROS_MASTER_URI at the public/shared master only.
   -->
-  <include file="$(find movo_servo_teleop_demo)/launch/movo_servo_teleop_demo.launch">
-    <arg name="rviz" value="$(arg rviz)" />
-    <arg name="launch_joy" value="$(arg launch_joy)" />
-    <arg name="joy_dev" value="$(arg joy_dev)" />
-    <arg name="launch_realsense_d455" value="$(arg launch_realsense_d455)" />
-    <arg name="realsense_namespace" value="$(arg realsense_namespace)" />
-    <arg name="default_active_arm" value="$(arg default_active_arm)" />
-    <arg name="enable_left_servo" value="$(arg enable_left_servo)" />
-    <arg name="servo_start_delay" value="$(arg servo_start_delay)" />
-    <arg name="load_test_obstacle" value="$(arg load_test_obstacle)" />
-    <arg name="use_rosbridge_compat" value="$(arg use_rosbridge_compat)" />
-    <arg name="use_real_arms" value="true" />
-    <arg name="local_machine_ip" value="$(arg local_machine_ip)" />
-    <arg name="real_arms_use_urdf" value="$(arg real_arms_use_urdf)" />
-    <arg name="real_arms_feedback_publish_rate" value="$(arg real_arms_feedback_publish_rate)" />
-    <arg name="respawn_real_arm_driver" value="$(arg respawn_real_arm_driver)" />
-  </include>
+
+  <node pkg="movo_servo_teleop_demo" type="private_compute_stack.py"
+        name="private_compute_stack" output="screen" required="true">
+    <param name="private_master_uri" value="$(arg private_master_uri)" />
+    <param name="private_ros_ip" value="$(arg private_ros_ip)" />
+    <param name="start_private_roscore" value="$(arg start_private_roscore)" />
+    <param name="fail_if_private_master_running" value="$(arg fail_if_private_master_running)" />
+    <param name="private_master_wait_timeout_sec" value="$(arg private_master_wait_timeout_sec)" />
+    <param name="private_launch_file" value="$(find movo_servo_teleop_demo)/launch/movo_servo_private_compute.launch" />
+
+    <param name="rviz" value="$(arg rviz)" />
+    <param name="launch_joy" value="$(arg launch_joy)" />
+    <param name="joy_dev" value="$(arg joy_dev)" />
+    <param name="launch_realsense_d455" value="$(arg launch_realsense_d455)" />
+    <param name="realsense_namespace" value="$(arg realsense_namespace)" />
+    <param name="realsense_clip_distance" value="$(arg realsense_clip_distance)" />
+    <param name="octomap_max_range" value="$(arg octomap_max_range)" />
+    <param name="live_octomap_refresh" value="$(arg live_octomap_refresh)" />
+    <param name="live_octomap_refresh_period_sec" value="$(arg live_octomap_refresh_period_sec)" />
+    <param name="live_octomap_refresh_startup_delay_sec" value="$(arg live_octomap_refresh_startup_delay_sec)" />
+    <param name="default_active_arm" value="$(arg default_active_arm)" />
+    <param name="enable_left_servo" value="$(arg enable_left_servo)" />
+    <param name="servo_start_delay" value="$(arg servo_start_delay)" />
+    <param name="load_test_obstacle" value="$(arg load_test_obstacle)" />
+    <param name="local_machine_ip" value="$(arg local_machine_ip)" />
+    <param name="real_arms_use_urdf" value="$(arg real_arms_use_urdf)" />
+    <param name="real_arms_feedback_publish_rate" value="$(arg real_arms_feedback_publish_rate)" />
+    <param name="respawn_real_arm_driver" value="$(arg respawn_real_arm_driver)" />
+    <param name="left_arm_ip" value="$(arg left_arm_ip)" />
+    <param name="right_arm_ip" value="$(arg right_arm_ip)" />
+    <param name="left_robot_port" value="$(arg left_robot_port)" />
+    <param name="right_robot_port" value="$(arg right_robot_port)" />
+    <param name="left_local_cmd_port" value="$(arg left_local_cmd_port)" />
+    <param name="left_local_broadcast_port" value="$(arg left_local_broadcast_port)" />
+    <param name="right_local_cmd_port" value="$(arg right_local_cmd_port)" />
+    <param name="right_local_broadcast_port" value="$(arg right_local_broadcast_port)" />
+    <param name="left_arm_serial" value="$(arg left_arm_serial)" />
+    <param name="right_arm_serial" value="$(arg right_arm_serial)" />
+  </node>
+
+  <node pkg="movo_servo_teleop_demo" type="rosbridge_public_gateway.py"
+        name="rosbridge_public_gateway" output="screen" required="true">
+    <rosparam command="load" file="$(find movo_servo_teleop_demo)/config/rosbridge_compat.yaml" />
+    <param name="private_master_uri" value="$(arg private_master_uri)" />
+    <param name="private_ros_ip" value="$(arg private_ros_ip)" />
+    <param name="config_namespace" value="/movo_servo_teleop_demo/real_arms" />
+  </node>
 </launch>

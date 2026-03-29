@@ -1,0 +1,69 @@
+<launch>
+  <arg name="rviz" default="true" />
+  <arg name="launch_joy" default="false" />
+  <arg name="joy_dev" default="/dev/input/js0" />
+  <arg name="launch_realsense_d455" default="false" />
+  <arg name="realsense_namespace" default="d455" />
+  <arg name="realsense_clip_distance" default="6.0" />
+  <arg name="octomap_max_range" default="0.8" />
+  <arg name="live_octomap_refresh" default="true" />
+  <arg name="live_octomap_refresh_period_sec" default="0.15" />
+  <arg name="live_octomap_refresh_startup_delay_sec" default="8.0" />
+  <arg name="default_active_arm" default="right" />
+  <arg name="enable_left_servo" default="true" />
+  <arg name="servo_start_delay" default="18.0" />
+  <arg name="load_test_obstacle" default="false" />
+  <arg name="local_machine_ip" default="" />
+  <arg name="real_arms_use_urdf" default="false" />
+  <arg name="real_arms_feedback_publish_rate" default="0.1" />
+  <arg name="respawn_real_arm_driver" default="true" />
+  <arg name="left_arm_ip" default="192.168.131.20" />
+  <arg name="right_arm_ip" default="192.168.131.30" />
+  <arg name="left_robot_port" default="65535" />
+  <arg name="right_robot_port" default="25000" />
+  <arg name="left_local_cmd_port" default="25010" />
+  <arg name="left_local_broadcast_port" default="25015" />
+  <arg name="right_local_cmd_port" default="25000" />
+  <arg name="right_local_broadcast_port" default="25005" />
+  <arg name="left_arm_serial" default="PJ00900006432489-0" />
+  <arg name="right_arm_serial" default="PJ00900006509075-0" />
+
+  <include file="$(find movo_servo_teleop_demo)/launch/movo_servo_teleop_demo.launch">
+    <arg name="rviz" value="$(arg rviz)" />
+    <arg name="launch_joy" value="$(arg launch_joy)" />
+    <arg name="joy_dev" value="$(arg joy_dev)" />
+    <arg name="launch_realsense_d455" value="$(arg launch_realsense_d455)" />
+    <arg name="realsense_namespace" value="$(arg realsense_namespace)" />
+    <arg name="realsense_clip_distance" value="$(arg realsense_clip_distance)" />
+    <arg name="octomap_max_range" value="$(arg octomap_max_range)" />
+    <arg name="live_octomap_refresh" value="$(arg live_octomap_refresh)" />
+    <arg name="live_octomap_refresh_period_sec" value="$(arg live_octomap_refresh_period_sec)" />
+    <arg name="live_octomap_refresh_startup_delay_sec" value="$(arg live_octomap_refresh_startup_delay_sec)" />
+    <arg name="default_active_arm" value="$(arg default_active_arm)" />
+    <arg name="enable_left_servo" value="$(arg enable_left_servo)" />
+    <arg name="servo_start_delay" value="$(arg servo_start_delay)" />
+    <arg name="load_test_obstacle" value="$(arg load_test_obstacle)" />
+    <arg name="use_real_arms" value="true" />
+    <arg name="use_rosbridge_compat" value="false" />
+    <arg name="local_machine_ip" value="$(arg local_machine_ip)" />
+    <arg name="real_arms_use_urdf" value="$(arg real_arms_use_urdf)" />
+    <arg name="real_arms_feedback_publish_rate" value="$(arg real_arms_feedback_publish_rate)" />
+    <arg name="respawn_real_arm_driver" value="$(arg respawn_real_arm_driver)" />
+    <arg name="left_arm_ip" value="$(arg left_arm_ip)" />
+    <arg name="right_arm_ip" value="$(arg right_arm_ip)" />
+    <arg name="left_robot_port" value="$(arg left_robot_port)" />
+    <arg name="right_robot_port" value="$(arg right_robot_port)" />
+    <arg name="left_local_cmd_port" value="$(arg left_local_cmd_port)" />
+    <arg name="left_local_broadcast_port" value="$(arg left_local_broadcast_port)" />
+    <arg name="right_local_cmd_port" value="$(arg right_local_cmd_port)" />
+    <arg name="right_local_broadcast_port" value="$(arg right_local_broadcast_port)" />
+    <arg name="left_arm_serial" value="$(arg left_arm_serial)" />
+    <arg name="right_arm_serial" value="$(arg right_arm_serial)" />
+  </include>
+
+  <node pkg="movo_servo_teleop_demo" type="rosbridge_private_gateway.py"
+        name="rosbridge_private_gateway" output="screen">
+    <rosparam command="load" file="$(find movo_servo_teleop_demo)/config/rosbridge_compat.yaml" />
+    <param name="config_namespace" value="/movo_servo_teleop_demo/real_arms" />
+  </node>
+</launch>
