@@ -22,6 +22,17 @@
   <arg name="jiggle_fraction" default="0.05" />
   <arg name="publish_monitored_planning_scene" default="true"/>
   <arg name="moveit_octomap_sensor_params_file" default="$(find movo_7dof_moveit_config)/config/sensors.yaml" />
+  <arg name="octomap_max_range" default="5.0" />
+  <arg name="use_depth_image_octomap_updater" default="false" />
+  <arg name="depth_image_topic" default="/camera/depth_registered/image_raw" />
+  <arg name="depth_image_queue_size" default="5" />
+  <arg name="depth_image_near_clipping_plane_distance" default="0.2" />
+  <arg name="depth_image_far_clipping_plane_distance" default="5.0" />
+  <arg name="depth_image_shadow_threshold" default="0.2" />
+  <arg name="depth_image_padding_scale" default="4.0" />
+  <arg name="depth_image_padding_offset" default="0.03" />
+  <arg name="depth_image_max_update_rate" default="15.0" />
+  <arg name="depth_image_filtered_cloud_topic" default="filtered_cloud" />
 
   <!-- Planning Functionality -->
   <include ns="move_group" file="$(find movo_7dof_moveit_config)/launch/planning_pipeline.launch.xml">
@@ -39,7 +50,18 @@
   <rosparam command="delete" param="move_group/sensors" />
   <include ns="move_group" file="$(find movo_7dof_moveit_config)/launch/sensor_manager.launch.xml" if="$(arg allow_trajectory_execution)">
     <arg name="moveit_sensor_manager" value="movo" />
+    <arg name="octomap_max_range" value="$(arg octomap_max_range)" />
     <arg name="moveit_octomap_sensor_params_file" value="$(arg moveit_octomap_sensor_params_file)" />
+    <arg name="use_depth_image_octomap_updater" value="$(arg use_depth_image_octomap_updater)" />
+    <arg name="depth_image_topic" value="$(arg depth_image_topic)" />
+    <arg name="depth_image_queue_size" value="$(arg depth_image_queue_size)" />
+    <arg name="depth_image_near_clipping_plane_distance" value="$(arg depth_image_near_clipping_plane_distance)" />
+    <arg name="depth_image_far_clipping_plane_distance" value="$(arg depth_image_far_clipping_plane_distance)" />
+    <arg name="depth_image_shadow_threshold" value="$(arg depth_image_shadow_threshold)" />
+    <arg name="depth_image_padding_scale" value="$(arg depth_image_padding_scale)" />
+    <arg name="depth_image_padding_offset" value="$(arg depth_image_padding_offset)" />
+    <arg name="depth_image_max_update_rate" value="$(arg depth_image_max_update_rate)" />
+    <arg name="depth_image_filtered_cloud_topic" value="$(arg depth_image_filtered_cloud_topic)" />
   </include>
 
   <!-- Start the actual move_group node/action server -->

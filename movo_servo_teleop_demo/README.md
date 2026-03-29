@@ -136,7 +136,7 @@ roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
 Quick D455 health check while the launch is running:
 
 ```bash
-rostopic hz /d455/depth/color/points
+rostopic hz /d455/aligned_depth_to_color/image_raw
 rosrun movo_servo_teleop_demo check_d455_moveit_perception.py
 ```
 
@@ -158,13 +158,42 @@ What the Phase 1 D455 path does:
 - starts Intel's ROS1 `realsense2_camera` wrapper
 - enables depth, color, aligned depth, and point cloud output
 - attaches the D455 frame tree to the existing `kinect2_link` mount with a static transform
-- feeds MoveIt Octomap directly from:
-  - `/d455/depth/color/points`
+- feeds MoveIt Octomap directly from the aligned D455 depth image:
+  - `/d455/aligned_depth_to_color/image_raw`
+- keeps the D455 depth stream out to `6.0 m` so removed obstacles still have background data available for clearing
+- limits the MoveIt depth-octomap updater itself to `0.8 m` so only nearby obstacles become occupied voxels
+- raises the Octomap update cap to `15 Hz` for faster clearing of transient obstacles
+- runs a lightweight octomap live-refresh node so stale occupied cells are periodically dropped and rebuilt from the current depth view
 - also relays the D455 point cloud onto the legacy MOVO topics for compatibility:
   - `/kinect/sd/points`
   - `/kinect2/sd/points`
 
-This avoids a broad URDF/SRDF rewrite while still letting MoveIt Servo plan around live depth data from the D455.
+This avoids a broad URDF/SRDF rewrite while still letting MoveIt Servo plan around live depth data from the D455. The aligned depth-image updater is also less prone to leaving behind "ghost" occupied voxels after a transient obstacle such as a hand moves away.
+
+If you want the octomap to behave like a live obstacle layer instead of a persistent map, leave the default refresh enabled. The key launch args are:
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  launch_realsense_d455:=true \
+  realsense_clip_distance:=6.0 \
+  octomap_max_range:=0.8 \
+  live_octomap_refresh:=true \
+  live_octomap_refresh_period_sec:=0.15
+```
+
+The current defaults are tuned for faster disappearance of stale octomap voxels:
+
+- depth-image octomap update rate: `30 Hz`
+- live octomap refresh period: `0.15 s`
+- RViz planning-scene display time: `0.05 s`
+
+If you want to see farther into the scene anyway, you can still raise the D455 depth range at launch, but that will also pull more room clutter into the planning scene:
+
+```bash
+roslaunch movo_servo_teleop_demo movo_servo_teleop_demo.launch \
+  launch_realsense_d455:=true \
+  realsense_clip_distance:=5.0
+```
 
 If the camera package is not installed yet:
 

@@ -11,7 +11,7 @@
   <arg name="color_width" default="640" />
   <arg name="color_height" default="480" />
   <arg name="color_fps" default="30" />
-  <arg name="clip_distance" default="2.5" />
+  <arg name="clip_distance" default="6.0" />
 
   <!-- Keep the existing MOVO Kinect mount in the robot model for Phase 1.
        The D455 publishes its own frame tree rooted at d455_link and we attach

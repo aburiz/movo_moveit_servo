@@ -4,6 +4,11 @@
   <arg name="joy_dev" default="/dev/input/js0" />
   <arg name="launch_realsense_d455" default="false" />
   <arg name="realsense_namespace" default="d455" />
+  <arg name="realsense_clip_distance" default="6.0" />
+  <arg name="octomap_max_range" default="0.8" />
+  <arg name="live_octomap_refresh" default="true" />
+  <arg name="live_octomap_refresh_period_sec" default="0.15" />
+  <arg name="live_octomap_refresh_startup_delay_sec" default="8.0" />
   <arg name="default_active_arm" default="right" />
   <arg name="enable_left_servo" default="true" />
   <arg name="servo_start_delay" default="18.0" />
@@ -57,6 +62,7 @@
   <include if="$(arg launch_realsense_d455)"
            file="$(find movo_servo_teleop_demo)/launch/d455_moveit_perception.launch">
     <arg name="camera_namespace" value="$(arg realsense_namespace)" />
+    <arg name="clip_distance" value="$(arg realsense_clip_distance)" />
   </include>
 
   <!-- MoveIt core for planning scene + collision model -->
@@ -72,9 +78,29 @@
     <arg name="allow_trajectory_execution" value="true" />
     <arg name="fake_execution" value="true" />
     <arg name="info" value="true" />
+    <arg name="octomap_max_range" value="$(arg octomap_max_range)" />
+    <arg name="use_depth_image_octomap_updater" value="true" />
+    <arg name="depth_image_topic" value="/$(arg realsense_namespace)/aligned_depth_to_color/image_raw" />
+    <arg name="depth_image_queue_size" value="5" />
+    <arg name="depth_image_near_clipping_plane_distance" value="0.2" />
+    <arg name="depth_image_far_clipping_plane_distance" value="$(arg octomap_max_range)" />
+    <arg name="depth_image_shadow_threshold" value="0.2" />
+    <arg name="depth_image_padding_scale" value="4.0" />
+    <arg name="depth_image_padding_offset" value="0.03" />
+    <arg name="depth_image_max_update_rate" value="30.0" />
+    <arg name="depth_image_filtered_cloud_topic" value="filtered_cloud" />
     <arg name="moveit_octomap_sensor_params_file"
          value="$(find movo_servo_teleop_demo)/config/d455_moveit_sensors.yaml" />
   </include>
+
+  <node if="$(eval arg('launch_realsense_d455') and arg('live_octomap_refresh'))"
+        pkg="movo_servo_teleop_demo" type="octomap_live_refresh.py"
+        name="octomap_live_refresh" output="screen">
+    <param name="apply_planning_scene_service" value="/apply_planning_scene" />
+    <param name="octomap_frame" value="base_link" />
+    <param name="startup_delay_sec" value="$(arg live_octomap_refresh_startup_delay_sec)" />
+    <param name="clear_period_sec" value="$(arg live_octomap_refresh_period_sec)" />
+  </node>
 
   <include if="$(arg rviz)" file="$(find movo_7dof_moveit_config)/launch/moveit_rviz.launch">
     <arg name="config" value="true" />

@@ -5,6 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
   diagnostic_msgs
   geometry_msgs
   kinova_msgs
+  moveit_msgs
   rospy
   sensor_msgs
   std_msgs
@@ -18,6 +19,7 @@ catkin_install_python(PROGRAMS
   scripts/real_kinova_command_bridge.py
   scripts/ping_real_arm.py
   scripts/check_d455_moveit_perception.py
+  scripts/octomap_live_refresh.py
   scripts/real_arm_launch_error.py
   scripts/add_test_obstacles.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
